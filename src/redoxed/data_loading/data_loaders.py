@@ -101,14 +101,27 @@ class BaseLoader(ABC):
 
 
 class BiologicLoader(BaseLoader):
-    """_summary_
-    Args:
-        BaseLoader (_type_): _description_
+    """Loader for Biologic files.
+
+    This class provides functionality to load data from Biologic `.mpr` and `.mpt` files
+    and convert it into an ECData object.
+
+    Attributes:
+        df (Optional[pd.DataFrame]): The loaded data as a pandas DataFrame.
+        metadata (Optional[dict]): Metadata extracted from the file (for `yadg` method).
+        variables (Optional[list[str]]): List of variable names extracted from the file (for `yadg` method).
     """
+
+    # Class attribute type annotations
+    df: Optional[pd.DataFrame]
+    metadata: Optional[dict]
+    variables: Optional[list[str]]
 
     def __init__(self) -> None:
         """Initialize the BiologicLoader."""
         self.df = None
+        self.metadata = None
+        self.variables = None
 
     def load_data(
         self, fpath: str, method: Optional[str] = None, label: Optional[str] = None
@@ -118,22 +131,26 @@ class BiologicLoader(BaseLoader):
         Args:
             fpath (str): The file path to the Biologic data file.
             method (Optional[str]): The method to use for loading the data. Defaults to None.
+                Supported methods are 'galvani' and 'yadg' for `.mpr` files.
             label (Optional[str]): An optional label for the data. Defaults to None.
 
         Raises:
-            ValueError: If the file cannot be processed or the method is unsupported.
+            ValueError: If the file cannot be processed, the method is unsupported,
+                or the file format is invalid.
 
         Returns:
             ECData: An ECData object containing the loaded data.
         """
-        self._convert_fpath(fpath)  # convert fpath to absolute path and get file type
-        # Convert file to ECData object
+        # Convert the file path to an absolute path and extract the file type
+        self._convert_fpath(fpath)
+
         try:
             if self.ftype == "mpr":
-                # set method to galvani if none provided
-                if method == None:
+                # Default to 'galvani' method if none is provided
+                if method is None:
                     method = "galvani"
-                # attempt to load data using the specified method
+
+                # Attempt to load data using the specified method
                 if method == "galvani":
                     try:
                         mpr_file = BioLogic.MPRfile(fpath)
@@ -148,11 +165,10 @@ class BiologicLoader(BaseLoader):
                         dt = yadg.extractors.extract(filetype="eclab.mpr", path=fpath)
                         self.metadata = dt.attrs
                         self.variables = list(dt.data_vars.keys())
+
                         # Convert DataTree to DataFrame
-                        data_dic = {}
-                        for variable in list(
-                            dt.data_vars.values()
-                        ):  # unit name conversion for consistency with other loaders
+                        data_dic: dict[str, pd.Series] = {}
+                        for variable in dt.data_vars.values():
                             label = variable.name
                             try:
                                 unit = variable.units
@@ -160,7 +176,7 @@ class BiologicLoader(BaseLoader):
                                     unit = "Ohm"
                                 elif "·" in unit:
                                     unit = unit.replace("·", ".")
-                                label = label + "/" + unit
+                                label = f"{label}/{unit}"
                             except Exception as e:
                                 raise ValueError(
                                     f"Error processing variable units: {e}"
@@ -178,9 +194,8 @@ class BiologicLoader(BaseLoader):
                     )
 
             elif self.ftype == "mpt":
-                # currently defaults to brute force method of conversion
+                # Attempt to load `.mpt` file using brute force header detection
                 try:
-                    # Initialize guess for header row
                     header_row_guess = 0
                     for i, _ in enumerate(open(self.fpath)):
                         pass
@@ -208,15 +223,68 @@ class BiologicLoader(BaseLoader):
                     self.df = df
                 except Exception as e:
                     raise ValueError(f"Failed to process mpt file. Error: {e}")
-            # self.__validate_data__()
 
-            # if no label provided, use fpath
+            # If no label is provided, use the file path as the label
             if label is None:
                 label = self.fpath
-            # return final ECData object
+
+            # Return the loaded data as an ECData object
             return ECData(df=self.df, label=label)
 
         except Exception as e:
+            raise ValueError(f"Failed to load data from {fpath}. Error: {e}")
+
+
+class CSVLoader(BaseLoader):
+    """Loader for CSV files.
+
+    This class provides functionality to load data from CSV files and convert
+    it into an ECData object.
+
+    Attributes:
+        df (Optional[pd.DataFrame]): The loaded data as a pandas DataFrame.
+    """
+
+    def __init__(self) -> None:
+        """Initialize the CSVLoader."""
+        self.df = None
+
+    def load_data(
+        self, fpath: str, method: Optional[str] = None, label: Optional[str] = None
+    ) -> ECData:
+        """Load data from a CSV file and return an ECData object.
+
+        Args:
+            fpath (str): The file path to the CSV data file.
+            method (Optional[str]): The method to use for loading the data. Defaults to None.
+            label (Optional[str]): An optional label for the data. Defaults to None.
+
+        Raises:
+            ValueError: If the file cannot be processed or the file format is unsupported.
+
+        Returns:
+            ECData: An ECData object containing the loaded data.
+        """
+        # Convert the file path to an absolute path and extract the file type
+        self._convert_fpath(fpath)
+
+        try:
+            # Ensure the file type is CSV
+            if self.ftype != "csv":
+                raise ValueError("Unsupported file format. Please use a CSV file.")
+
+            # Load the CSV file into a pandas DataFrame
+            self.df = pd.read_csv(fpath)
+
+            # If no label is provided, use the file path as the label
+            if label is None:
+                label = self.fpath
+
+            # Return the loaded data as an ECData object
+            return ECData(df=self.df, label=label)
+
+        except Exception as e:
+            # Raise an error if the file cannot be processed
             raise ValueError(f"Failed to load data from {fpath}. Error: {e}")
 
 
@@ -243,5 +311,10 @@ class LoaderFactory:
         """
         if fpath.endswith(".mpr"):
             return BiologicLoader()
+        if fpath.endswith(".mpt"):
+            return BiologicLoader()
+        if fpath.endswith(".csv"):
+            return CSVLoader()
+
         else:
             raise ValueError("Unsupported file format!")

@@ -17,6 +17,8 @@ class EISData:
     f: np.ndarray
     Z_re: np.ndarray
     Z_im: np.ndarray
+    Z_mag: np.ndarray
+    Z_phase: np.ndarray
     label: str | None
 
     def __init__(self, Z: np.ndarray, f: np.ndarray, label: str = None) -> None:
@@ -30,11 +32,19 @@ class EISData:
         """
         self.Z = Z
         self.f = f
-        self.Z_re = self.Z.real
-        self.Z_im = self.Z.imag
+        self._calculate_z_quants()
         self.label = label  # Optional label for the data
 
         self._validate()
+
+    def _calculate_z_quants(self) -> None:
+        """
+        Calculates the real and imaginary parts of the impedance from the complex impedance data.
+        """
+        self.Z_re = self.Z.real
+        self.Z_im = self.Z.imag
+        self.Z_mag = np.abs(self.Z)
+        self.Z_phase = np.angle(self.Z)
 
     def _validate(self) -> None:
         """
@@ -83,8 +93,7 @@ class EISData:
         mask = (self.f >= f_min) & (self.f <= f_max)
         self.Z = self.Z[mask]
         self.f = self.f[mask]
-        self.Z_re = self.Z.real
-        self.Z_im = self.Z.imag
+        self._calculate_z_quants()
 
     def trim_inductive(self) -> None:
         """
@@ -93,8 +102,7 @@ class EISData:
         mask = self.Z_im < 0
         self.Z = self.Z[mask]
         self.f = self.f[mask]
-        self.Z_re = self.Z.real
-        self.Z_im = self.Z.imag
+        self._calculate_z_quants()
 
     def estimate_real_intercept(self) -> float:
         """

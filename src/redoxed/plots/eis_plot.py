@@ -1,9 +1,176 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
+import os
 from matplotlib.ticker import MultipleLocator, AutoMinorLocator, LogLocator
+from pathlib import Path
+import warnings
 
 
+class EISPlot:
+    def __init__(self, EISData):
+        """
+        Initializes the EISPlot object.
+
+        Args:
+            EISData: A single EISData instance or a list/array of EISData instances.
+        """
+        # Check if EISData is a single instance, list, or numpy array
+        if isinstance(EISData, (list, np.ndarray)):  # check if list or np.array
+            self.EISData_list = np.array(EISData)  # convert list to or keep as np.array
+        else:
+            self.EISData_list = np.array([EISData])  # make into np.array
+
+        # Load the custom style
+        self._load_style()
+
+    def _load_style(self):
+        """
+        Loads the custom Matplotlib style from the .mplstyle file.
+        """
+        # Dynamically resolve the path to the .mplstyle file
+        style_path = Path(__file__).parent / "eis_plot.mplstyle"
+        print(f"Loading style from: {style_path}")
+
+        # Apply Seaborn theme
+        sns.set_theme(
+            context="paper", style="whitegrid", palette="muted", font="Times New Roman"
+        )
+
+        # Check if the style file exists and apply it on top of Seaborn theme
+        if os.path.exists(style_path):
+            plt.style.use(style_path)
+        else:
+            warnings.warn(
+                f"Style file '{style_path}' not found. Using default Matplotlib style.",
+                UserWarning,
+            )
+
+    def plot_nyquist(self, **kwargs):
+        """
+        Plots the Nyquist plot for the EIS data.
+
+        Args:
+            **kwargs: Additional keyword arguments for customization.
+        """
+        # Extract figure size if provided
+        figsize = kwargs.pop("figsize", None)  # Use default from .mplstyle if None
+        fig, ax = plt.subplots(1, 1, figsize=figsize)
+
+        # Extract optional arguments
+        labelled_frequencies = kwargs.pop("labelled_frequencies", None)
+        freq_label_offset = kwargs.pop("freq_label_offset", (0.05, 0.05))
+
+        for i, EISData in enumerate(self.EISData_list):
+            if EISData.dataset_type == "measured":
+                ax.plot(
+                    EISData.Z_re,
+                    -EISData.Z_im,
+                    label=EISData.label,
+                    color=EISData.colour,
+                    marker="o",
+                    fillstyle="none",
+                    linestyle="none",
+                    **kwargs,
+                )
+            elif EISData.dataset_type == "fitted":
+                ax.plot(
+                    EISData.Z_re,
+                    -EISData.Z_im,
+                    label=EISData.label,
+                    color=EISData.colour,
+                    marker="none",
+                    **kwargs,
+                )
+
+            # Add labels at specified frequencies
+            if labelled_frequencies is not None:
+                for freq in labelled_frequencies:
+                    index = np.argmin(np.abs(EISData.f - freq))
+                    x, y = EISData.Z_re[index], -EISData.Z_im[index]
+                    offset_x, offset_y = (
+                        x + freq_label_offset[0],
+                        y + freq_label_offset[1],
+                    )
+                    freq_exp = np.log10(freq)
+                    annotation_text = r"$10^{" + f"{freq_exp:.0f}" + "}$"
+                    ax.annotate(
+                        annotation_text,
+                        xy=(x, y),
+                        xytext=(offset_x, offset_y),
+                        arrowprops=dict(
+                            arrowstyle="->", connectionstyle="arc", color="black"
+                        ),
+                    )
+
+        # Ensure ratio equal
+        ax.set_aspect("equal", adjustable="datalim")
+
+        # Set labels
+        ax.set_xlabel(r"$\operatorname{Re}(Z)$ / $\Omega$")
+        ax.set_ylabel(r"$-\operatorname{Im}(Z)$ / $\Omega$")
+
+        # Add legend if enabled
+        if kwargs.pop("legend", True):
+            ax.legend()
+
+        # Close the plot to avoid spamming in Jupyter Notebook
+        plt.close(fig)
+
+        return fig, ax
+
+    def plot_bode(self, **kwargs):
+        """
+        Plots the Bode plot for the EIS data.
+
+        Args:
+            **kwargs: Additional keyword arguments for customization.
+        """
+        # Extract figure size if provided
+        figsize = kwargs.pop("figsize", None)  # Use default from .mplstyle if None
+        fig, ax = plt.subplots(1, 1, figsize=figsize)
+
+        for i, EISData in enumerate(self.EISData_list):
+            if EISData.dataset_type == "measured":
+                ax.plot(
+                    EISData.f,
+                    EISData.Z_mag,
+                    label=EISData.label + " Magnitude",
+                    color=EISData.colour,
+                    marker="o",
+                    fillstyle="none",
+                    linestyle="none",
+                    **kwargs,
+                )
+            elif EISData.dataset_type == "fitted":
+                ax.plot(
+                    EISData.f,
+                    EISData.Z_mag,
+                    label=EISData.label + " Magnitude",
+                    color=EISData.colour,
+                    marker="none",
+                    linestyle="-",
+                    **kwargs,
+                )
+
+        ax.set_yscale("log")
+        ax.set_xscale("log")
+
+        # Set labels
+        ax.set_xlabel(r"$f$ / $\mathrm{Hz}$")
+        ax.set_ylabel(r"$\left| Z \right|$ / $\Omega$")
+
+        # Add legend if enabled
+        if kwargs.pop("legend", True):
+            ax.legend()
+
+        # Close the plot to avoid spamming in Jupyter Notebook
+        plt.close(fig)
+
+        return fig, ax
+
+
+"""
 class EISPlot:
     def __init__(self, EISData):
         # Check if EISData is a single instance, list, or numpy array
@@ -161,7 +328,7 @@ class EISPlot:
             if EISData.dataset_type == "measured":
                 ax.plot(
                     EISData.f,
-                    EISData.magnitudes,
+                    EISData.Z_mag,
                     label=EISData.label + " Magnitude",
                     color=EISData.colour,
                     marker="o",
@@ -172,7 +339,7 @@ class EISPlot:
             elif EISData.dataset_type == "fitted":
                 ax.plot(
                     EISData.f,
-                    EISData.magnitudes,
+                    EISData.Z_mag,
                     label=EISData.label + " Magnitude",
                     color=EISData.colour,
                     marker="none",
@@ -332,3 +499,4 @@ class EISPlot:
         # close the plot so it doesn't spam in jupyter notebook
         plt.close(fig)
         return fig, ax
+"""
