@@ -1,6 +1,8 @@
-from redoxed.impedance import EISData
+# from redoxed.impedance.eis_data import EISData
 
 import pandas as pd
+
+import numpy as np
 
 from nanodrt.dataobjects.dataobject import EISDataObject
 from nanodrt.calculators import ImpedanceCalculator
@@ -9,68 +11,98 @@ from nanodrt.optimizers import ImpedanceOptimizer
 import jax.numpy as jnp
 
 
-class DRT:
-    def __init__(self, **kwargs):
-        self.tau = []
-        self.gamma = []
-        self.label = kwargs.pop("label", None)
+class DRTData:
+    """
+    A class to store and process Distribution of Relaxation Times (DRT) data.
 
-    def fit_DRT_nanodrt(self, EISData_object, mu=None, tau=None, lambda_value=0):
-        # load the data into the nanodrt object
-        data_object = EISDataObject(
-            Z_re=EISData_object.Z_re, Z_im=EISData_object.Z_im, f=EISData_object.f
-        )
-        # Create instance of RBF
-        config = {"mu": mu}
-        rbf = GaussianRBF(config)
+    Attributes:
+        tau (np.ndarray): Array of relaxation times.
+        gamma (np.ndarray): Array of gamma values corresponding to tau.
+        label (Optional[str]): An optional label for the dataset.
+    """
 
-        tau_values = tau  # tau values for the DRT
-        freq_values = data_object.f  # frequency values from the EIS data
-        lambda_value = lambda_value
+    tau: np.ndarray
+    gamma: np.ndarray
+    label: str | None
 
-        # Create ImpedanceCalculator instance
-        calculator = ImpedanceCalculator(
-            rbf, tau_values, freq_values, dy=0.001, y_max=10, y_min=-10
-        )
-        # initial guess assuming all ones
-        x_values = jnp.ones(len(tau_values) + 2)
-
-        # run
-        optimizer = ImpedanceOptimizer(calculator, data_object)
-        optimizer.add_regularisation(lambda_value=1e-3)
-        results = optimizer.run(
-            x_values, method="scipy", config={"method": "BFGS", "maxiter": 1000}
-        )  # lowered from 10000
-        Z = calculator.simulate(
-            results.params[:-2], results.params[-2], results.params[-1]
-        )
-        # plt.plot(x.real[:-3], -x.imag[:-3], '-o')
-        # plt.plot(data_object.Z_re, -data_object.Z_im, 'o')
-        # plt.show()
-        gamma = calculator.simulate_gamma(results.params[:-2])
-        # plt.plot(jnp.log(tau_values), gamma, "-o")
-
-        self.tau = tau_values
+    def __init__(self, tau: np.ndarray, gamma: np.ndarray, label=None) -> None:
+        self.tau = tau
         self.gamma = gamma
-        self.R_0 = results.params[-2]
-        self.L_0 = results.params[-1]
-        self.lambda_value = 1e-3
+        self.label = label
+        self._validate()
 
-        df_temp = {
-            "freq/Hz": freq_values,
-            "Re(Z)/Ohm": Z.real,
-            "-Im(Z)/Ohm": -Z.imag,
-        }  # prepare df
-        df_temp = pd.DataFrame(df_temp)  # convert to pd df
-        self.EIS_data_fit = EISData(
-            df_temp, dataset_type="fitted"
-        )  # store as EIS_data object
-        # (
-        #     self.EIS_data_fit.residuals_real,
-        #     self.EIS_data_fit.residuals_imag,
-        #     self.EIS_data_fit.residuals_real_rmse,
-        #     self.EIS_data_fit.residuals_imag_rmse,
-        # ) = EISData_object.calculate_residuals(self.EIS_data_fit)
+    def _validate(self) -> None:
+        """
+        Validates the input data to ensure consistency and correctness.
+
+        Raises:
+            ValueError: If tau and gamma do not have the same shape.
+            ValueError: If tau and gamma are not 1D arrays.
+            ValueError: If tau or gamma arrays are empty.
+        """
+        if self.tau.shape != self.gamma.shape:
+            raise ValueError("tau and gamma must have the same shape.")
+        if len(self.tau.shape) != 1:
+            raise ValueError("tau and gamma must be 1D arrays.")
+        if self.tau.size == 0 or self.gamma.size == 0:
+            raise ValueError("tau and gamma arrays must not be empty.")
+
+    # def fit_DRT_nanodrt(self, EISData_object, mu=None, tau=None, lambda_value=0):
+    #     # load the data into the nanodrt object
+    #     data_object = EISDataObject(
+    #         Z_re=EISData_object.Z_re, Z_im=EISData_object.Z_im, f=EISData_object.f
+    #     )
+    #     # Create instance of RBF
+    #     config = {"mu": mu}
+    #     rbf = GaussianRBF(config)
+
+    #     tau_values = tau  # tau values for the DRT
+    #     freq_values = data_object.f  # frequency values from the EIS data
+    #     lambda_value = lambda_value
+
+    #     # Create ImpedanceCalculator instance
+    #     calculator = ImpedanceCalculator(
+    #         rbf, tau_values, freq_values, dy=0.001, y_max=10, y_min=-10
+    #     )
+    #     # initial guess assuming all ones
+    #     x_values = jnp.ones(len(tau_values) + 2)
+
+    #     # run
+    #     optimizer = ImpedanceOptimizer(calculator, data_object)
+    #     optimizer.add_regularisation(lambda_value=1e-3)
+    #     results = optimizer.run(
+    #         x_values, method="scipy", config={"method": "BFGS", "maxiter": 1000}
+    #     )  # lowered from 10000
+    #     Z = calculator.simulate(
+    #         results.params[:-2], results.params[-2], results.params[-1]
+    #     )
+    #     # plt.plot(x.real[:-3], -x.imag[:-3], '-o')
+    #     # plt.plot(data_object.Z_re, -data_object.Z_im, 'o')
+    #     # plt.show()
+    #     gamma = calculator.simulate_gamma(results.params[:-2])
+    #     # plt.plot(jnp.log(tau_values), gamma, "-o")
+
+    #     self.tau = tau_values
+    #     self.gamma = gamma
+    #     self.R_0 = results.params[-2]
+    #     self.L_0 = results.params[-1]
+    #     self.lambda_value = 1e-3
+
+    #     df_temp = {
+    #         "freq/Hz": freq_values,
+    #         "Re(Z)/Ohm": Z.real,
+    #         "-Im(Z)/Ohm": -Z.imag,
+    #     }  # prepare df
+    #     df_temp = pd.DataFrame(df_temp)  # convert to pd df
+    #     self.EIS_data_fit = EISData(
+    #         df_temp, dataset_type="fitted"
+    #     )  # store as EIS_data object
+    #     # (
+    #     #     self.EIS_data_fit.residuals_real,
+    #     #     self.EIS_data_fit.residuals_imag,
+    #     #     self.EIS_data_fit.residuals_real_rmse,
+    #     #     self.EIS_data_fit.residuals_imag_rmse,
+    #     # ) = EISData_object.calculate_residuals(self.EIS_data_fit)
 
 
 """
