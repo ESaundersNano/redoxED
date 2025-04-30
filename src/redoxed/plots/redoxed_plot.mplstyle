@@ -1,13 +1,13 @@
 # Figure settings
 figure.figsize: 3.25, 3  # Default figure size
-figure.dpi: 100
+figure.dpi: 300
 
 # Font settings
 font.family: Times New Roman
 font.size: 10
 
 # Grid settings
-axes.grid: True
+axes.grid: False
 grid.linewidth: 0.8
 
 # Tick settings

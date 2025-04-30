@@ -24,6 +24,26 @@ class ECData:
     def __repr__(self) -> str:
         return f"ECData(label={self.label})"
 
+    def filter_by_col(
+        self, col: str = "cycle number", condition: callable = lambda value: value == 1
+    ) -> pd.DataFrame:
+        """
+        Filter the DataFrame based on a condition applied to a column.
+
+        Args:
+            col (str): The column to filter on.
+            condition (callable): A function or lambda that takes a column value and returns a boolean.
+
+        Returns:
+            pd.DataFrame: A filtered DataFrame.
+
+        Raises:
+            ValueError: If the column is not found in the DataFrame.
+        """
+        if col not in self.df.columns:
+            raise ValueError(f"Column '{col}' not found in DataFrame.")
+        return self.df[self.df[col].apply(condition)]
+
     def to_EISData(
         self,
         column_mapping: dict[str, str | None] | None = None,
@@ -45,16 +65,17 @@ class ECData:
         required_columns = {
             key: value for key, value in column_mapping.items() if value is not None
         }
+        # Perform check for required columns
         if not all(col in self.df.columns for col in list(required_columns.values())):
             raise ValueError(
                 f"DataFrame did not contain the columns: {required_columns}"
             )
+        # Convert the DataFrame columns to extract Z and f
         elif all(key in required_columns for key in ["Z_re", "-Z_im", "f"]):
             Z = (
                 self.df[required_columns["Z_re"]].to_numpy()
                 - 1j * self.df[required_columns["-Z_im"]].to_numpy()
             )
-
         elif all(key in required_columns for key in ["Z", "f"]):
             Z = self.df[required_columns["Z"]].to_numpy()
         elif all(key in required_columns for key in ["Z_re", "Z_im", "f"]):

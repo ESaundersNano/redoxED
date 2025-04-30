@@ -32,7 +32,12 @@ class EISData:
         """
         self.Z = Z
         self.f = f
+        # Crop to f > 0 and calculate Z_quants
+        mask = (self.f > 0) & (self.f <= np.inf)
+        self.Z = self.Z[mask]
+        self.f = self.f[mask]
         self._calculate_z_quants()
+
         self.label = label  # Optional label for the data
 
         self._validate()
