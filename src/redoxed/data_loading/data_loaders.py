@@ -4,6 +4,7 @@ import os
 from typing import Optional
 import yadg
 from galvani import BioLogic
+import json
 
 from redoxed.data_loading import ECData
 
@@ -155,33 +156,44 @@ class BiologicLoader(BaseLoader):
                     try:
                         mpr_file = BioLogic.MPRfile(fpath)
                         self.df = pd.DataFrame(mpr_file.data)
+                        metadata_dict = {}
+                        metadata_dict["startdate"] = mpr_file.startdate
+                        metadata_dict["enddate"] = mpr_file.enddate
+                        metadata_dict["modules"] = mpr_file.modules
+                        self.metadata = metadata_dict
                     except Exception as e:
                         raise ValueError(
                             f"Galvani failed to convert the file. "
                             f"Error: {e}. Please open the file in EC-Lab and export it to a compatible format (e.g., mpt)."
                         )
-                elif method == "yadg":
+                elif (
+                    method == "yadg"
+                ):  # generally has more complete metadata and other data within the file
                     try:
                         dt = yadg.extractors.extract(filetype="eclab.mpr", path=fpath)
                         self.metadata = dt.attrs
                         self.variables = list(dt.data_vars.keys())
+                        self.metadata["ole_timestamp"] = json.loads(
+                            self.metadata["original_metadata"]
+                        )["log"][
+                            "ole_timestamp"
+                        ]  # days since midnight December 30, 1899, not sure if is start or end
 
                         # Convert DataTree to DataFrame
                         data_dic: dict[str, pd.Series] = {}
                         for variable in dt.data_vars.values():
-                            label = variable.name
+                            unit_label = variable.name
                             try:
                                 unit = variable.units
                                 if unit == "Ω":
                                     unit = "Ohm"
                                 elif "·" in unit:
                                     unit = unit.replace("·", ".")
-                                label = f"{label}/{unit}"
-                            except Exception as e:
-                                raise ValueError(
-                                    f"Error processing variable units: {e}"
-                                )
-                            data_dic[label] = variable.data
+                                unit_label = f"{unit_label}/{unit}"
+                            except:
+                                unit = None
+                                unit_label = unit_label
+                            data_dic[unit_label] = variable.data
                         self.df = pd.DataFrame(data_dic)
                     except Exception as e:
                         raise ValueError(
