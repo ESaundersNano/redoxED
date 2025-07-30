@@ -10,11 +10,11 @@ from redoxed.impedance import EISData
 
 
 class NyquistPlot:
-    def __init__(self, **kwargs):
+    def __init__(self, usetex=False, **kwargs):
         """ """
 
         # Load the custom style
-        self._load_style()
+        self._load_style(usetex=usetex)
 
         # Extract figure size if provided
         # figsize = kwargs.pop("figsize", None)  # Uses default from .mplstyle if None
@@ -31,8 +31,8 @@ class NyquistPlot:
         )
 
         # Set labels
-        ax.set_xlabel(r"$Z'$ / $\Omega$")
-        ax.set_ylabel(r"$-Z''$ / $\Omega$")
+        ax.set_xlabel(r"$Z^{\prime}$ / $\Omega$")
+        ax.set_ylabel(r"$Z^{\prime\prime}$ / $\Omega$")
 
         # Close the plot to avoid spamming output
         plt.close(fig)
@@ -41,30 +41,86 @@ class NyquistPlot:
         self.fig = fig
         self.ax = ax
 
-    def _load_style(self, style_path=None):
+    def _load_style(self, usetex, style_path=None):
         """
         Loads the custom Matplotlib style from the .mplstyle file.
         """
 
-        # Apply Seaborn theme as foundation style
-        sns.set_theme(
-            context="paper", style="whitegrid", palette="muted", font="Times New Roman"
-        )
-
-        # Apply custom style if provided
-        if style_path is None:
-            # Use the default style path if not provided
-            style_path = Path(__file__).parent / "redoxed_plot.mplstyle"
-        else:
-            print(f"Loading style from: {style_path}")
-        # Check if the style file exists and apply it on top of Seaborn theme
-        if os.path.exists(style_path):
-            plt.style.use(style_path)
-        else:
-            warnings.warn(
-                f"Style file '{style_path}' not found. Using default Matplotlib style.",
-                UserWarning,
+        if usetex == True:
+            # Apply Seaborn theme as foundation style
+            sns.set_theme(
+                context="paper",
+                style="whitegrid",
+                palette="muted",
+                font="Times New Roman",
             )
+
+            # Apply custom style if provided
+            if style_path is None:
+                style_path = Path(__file__).parent / "redoxed_plot.mplstyle"
+            else:
+                print(f"Loading style from: {style_path}")
+            if os.path.exists(style_path):
+                plt.style.use(style_path)
+            else:
+                warnings.warn(
+                    f"Style file '{style_path}' not found. Using default Matplotlib style.",
+                    UserWarning,
+                )
+
+            # Try to enable LaTeX rendering, fallback if not available
+            try:
+                import subprocess
+
+                subprocess.run(
+                    ["latex", "--version"],
+                    check=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                )
+                plt.rcParams["text.usetex"] = True
+                plt.rcParams["font.family"] = "serif"
+                plt.rcParams["font.serif"] = [
+                    "Times New Roman",
+                    "DejaVu Serif",
+                    "serif",
+                ]
+                plt.rcParams["text.latex.preamble"] = (
+                    r"\usepackage{newtxtext,newtxmath}"
+                )
+
+            except Exception:
+                plt.rcParams["text.usetex"] = False
+                plt.rcParams["font.family"] = "sans-serif"
+                plt.rcParams["font.sans-serif"] = [
+                    "Arial",
+                    "DejaVu Sans",
+                    "Liberation Sans",
+                    "sans-serif",
+                ]
+                warnings.warn(
+                    "LaTeX is not installed or not found. Falling back to default matplotlib mathtext rendering.",
+                    UserWarning,
+                )
+
+        elif usetex == False:
+            # Apply Seaborn theme as foundation style
+            sns.set_theme(
+                context="paper", style="whitegrid", palette="muted", font="Arial"
+            )
+
+            # Apply custom style if provided
+            if style_path is None:
+                style_path = Path(__file__).parent / "redoxed_plot.mplstyle"
+            else:
+                print(f"Loading style from: {style_path}")
+            if os.path.exists(style_path):
+                plt.style.use(style_path)
+            else:
+                warnings.warn(
+                    f"Style file '{style_path}' not found. Using default Matplotlib style.",
+                    UserWarning,
+                )
 
     def add_plot(self, EISData_object: EISData, label: str = None, **kwargs):
         """ """
