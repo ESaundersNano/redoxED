@@ -6,7 +6,7 @@ measurement data and converting it to specialized data types.
 """
 
 import pandas as pd
-from typing import Any, Optional, Tuple
+from typing import Any, Tuple
 from collections.abc import Callable
 import matplotlib.pyplot as plt
 
@@ -155,70 +155,6 @@ class ECData:
             and may need to be customized for individual users.
         """
         return converter(df=self.df, label=self.label, **kwargs)
-
-    def quick_plot(
-        self,
-        x_col: str,
-        y_col: str,
-        y2_col: Optional[str] = None,
-        figsize: Tuple[float, float] = (6, 3),
-    ) -> Tuple[plt.Figure, plt.Axes]:
-        """
-        Create a quick plot of data columns with optional twin y-axis.
-
-        Args:
-            x_col (str): Column name for x-axis data.
-            y_col (str): Column name for primary y-axis data.
-            y2_col (Optional[str]): Column name for secondary y-axis data (twin axis).
-                If None, no secondary axis is created.
-            figsize (Tuple[float, float]): Figure size as (width, height). Defaults to (6, 3).
-
-        Returns:
-            Tuple[plt.Figure, plt.Axes]: The figure and primary axes objects.
-
-        Raises:
-            ValueError: If any specified column is not found in the DataFrame.
-
-        Examples:
-            >>> fig, ax = ecdata.quick_plot("time", "voltage")
-            >>> fig, ax = ecdata.quick_plot("time", "voltage", "current")
-        """
-        # Validate columns exist
-        required_cols = [x_col, y_col]
-        if y2_col is not None:
-            required_cols.append(y2_col)
-
-        missing_cols = [col for col in required_cols if col not in self.df.columns]
-        if missing_cols:
-            available_cols = list(self.df.columns)
-            raise ValueError(
-                f"Column(s) {missing_cols} not found. Available columns: {available_cols}"
-            )
-
-        # Create the plot
-        fig, ax1 = plt.subplots(figsize=figsize)
-
-        # Plot primary data
-        color1 = "tab:blue"
-        ax1.set_xlabel(x_col)
-        ax1.set_ylabel(y_col, color=color1)
-        ax1.plot(self.df[x_col], self.df[y_col], color=color1, label=y_col)
-        ax1.tick_params(axis="y", labelcolor=color1)
-
-        # Plot secondary data if provided
-        ax2 = None
-        if y2_col is not None:
-            ax2 = ax1.twinx()
-            color2 = "tab:red"
-            ax2.set_ylabel(y2_col, color=color2)
-            ax2.plot(self.df[x_col], self.df[y2_col], color=color2, label=y2_col)
-            ax2.tick_params(axis="y", labelcolor=color2)
-
-        # Add grid and layout
-        ax1.grid(True, alpha=0.3)
-        fig.tight_layout()
-
-        return fig, ax1
 
     def _validate(self) -> None:
         """

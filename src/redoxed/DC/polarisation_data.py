@@ -19,7 +19,7 @@ class PolarisationData:
     ASR_error: float | None
 
     def __init__(
-        self, V: np.ndarray, j: np.ndarray, A: float, label: str = None
+        self, V: np.ndarray, j: np.ndarray, A: float, label: str | None = None
     ) -> None:
         """
         Initializes the PolarisationData object.
@@ -28,7 +28,7 @@ class PolarisationData:
             V (np.ndarray): Potential data.
             j (np.ndarray): Current density data.
             A (float): Area of the electrode.
-            label (str, optional): Optional label for the dataset. Defaults to None.
+            label (str | None, optional): Optional label for the dataset. Defaults to None.
         """
         self.V = V
         self.j = j

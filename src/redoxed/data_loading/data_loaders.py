@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 import pandas as pd
 import os
-from typing import Optional
 import yadg
 from galvani import BioLogic
 import json
@@ -17,15 +16,15 @@ class BaseLoader(ABC):
     and converting it into an ECData object.
 
     Attributes:
-        fpath (Optional[str]): The absolute file path of the data file.
-        ftype (Optional[str]): The file type (extension) of the data file.
-        df (Optional[pd.DataFrame]): The loaded data as a pandas DataFrame.
+        fpath (str | None): The absolute file path of the data file.
+        ftype (str | None): The file type (extension) of the data file.
+        df (pd.DataFrame | None): The loaded data as a pandas DataFrame.
     """
 
     # Class attribute type annotations
-    fpath: Optional[str]
-    ftype: Optional[str]
-    df: Optional[pd.DataFrame]
+    fpath: str | None
+    ftype: str | None
+    df: pd.DataFrame | None
 
     def __init__(self) -> None:
         self.fpath = None
@@ -34,28 +33,41 @@ class BaseLoader(ABC):
 
     @abstractmethod
     def load_data(
-        self, fpath: str, method: Optional[str] = None, label: Optional[str] = None
+        self, fpath: str, method: str | None = None, label: str | None = None
     ) -> ECData:
-        """Load data from a file and return an ECData object.
+        """
+        Load data from a file and return an ECData object.
 
-        Args:
-            fpath (str): The file path to the data file.
-            method (Optional[str]): The method to use for loading the data. Defaults to None.
-            label (Optional[str]): An optional label for the data. Defaults to None.
+        Parameters
+        ----------
+        fpath : str
+            The file path to the data file.
+        method : str, optional
+            The method to use for loading the data. Defaults to None.
+        label : str, optional
+            An optional label for the data. Defaults to None.
 
-        Returns:
-            ECData: An ECData object containing the loaded data.
+        Returns
+        -------
+        ECData
+            An ECData object containing the loaded data.
         """
         pass
 
     def _convert_fpath(self, fpath: str) -> None:
         """Convert the file path to an absolute path and extract the file type.
 
-        Args:
-            fpath (str): The file path to convert.
+        Parameters
+        ----------
+        fpath : str
+            The file path to convert.
         """
         self.fpath = os.path.abspath(fpath)
         self.ftype = os.path.splitext(fpath)[1][1:].lower()
+        # Get the base filename
+        base = os.path.basename(fpath)
+        # Split off the extension
+        self.name, _ = os.path.splitext(base)
 
     # def __validate_data__(self):
     #     """
@@ -109,15 +121,15 @@ class BiologicLoader(BaseLoader):
     and convert it into an ECData object.
 
     Attributes:
-        df (Optional[pd.DataFrame]): The loaded data as a pandas DataFrame.
-        metadata (Optional[dict]): Metadata extracted from the file (for `yadg` method).
-        variables (Optional[list[str]]): List of variable names extracted from the file (for `yadg` method).
+        df (pd.DataFrame | None): The loaded data as a pandas DataFrame.
+        metadata (dict | None): Metadata extracted from the file (for `yadg` method).
+        variables (list[str] | None): List of variable names extracted from the file (for `yadg` method).
     """
 
     # Class attribute type annotations
-    df: Optional[pd.DataFrame]
-    metadata: Optional[dict]
-    variables: Optional[list[str]]
+    df: pd.DataFrame | None
+    metadata: dict | None
+    variables: list[str] | None
 
     def __init__(self) -> None:
         """Initialize the BiologicLoader."""
@@ -126,22 +138,29 @@ class BiologicLoader(BaseLoader):
         self.variables = None
 
     def load_data(
-        self, fpath: str, method: Optional[str] = None, label: Optional[str] = None
+        self, fpath: str, method: str | None = None, label: str | None = None
     ) -> ECData:
-        """Load data from a Biologic file and return an ECData object.
+        """
+        Load data from a Biologic file and return an ECData object.
 
-        Args:
-            fpath (str): The file path to the Biologic data file.
-            method (Optional[str]): The method to use for loading the data. Defaults to None.
-                Supported methods are 'galvani' and 'yadg' for `.mpr` files.
-            label (Optional[str]): An optional label for the data. Defaults to None.
+        Parameters
+        ----------
+        fpath : str
+            The file path to the Biologic data file.
+        method : str, optional
+            The method to use for loading the data. Supported methods are 'galvani' and 'yadg' for `.mpr` files. Defaults to None.
+        label : str, optional
+            An optional label for the data. Defaults to None.
 
-        Raises:
-            ValueError: If the file cannot be processed, the method is unsupported,
-                or the file format is invalid.
+        Raises
+        ------
+        ValueError
+            If the file cannot be processed, the method is unsupported, or the file format is invalid.
 
-        Returns:
-            ECData: An ECData object containing the loaded data.
+        Returns
+        -------
+        ECData
+            An ECData object containing the loaded data.
         """
         # Convert the file path to an absolute path and extract the file type
         self._convert_fpath(fpath)
@@ -245,9 +264,9 @@ class BiologicLoader(BaseLoader):
                 except Exception as e:
                     raise ValueError(f"Failed to process mpt file. Error: {e}")
 
-            # If no label is provided, use the file path as the label
+            # If no label is provided, use the file name as the label
             if label is None:
-                label = self.fpath
+                label = self.name
 
             # Return the loaded data as an ECData object
             return ECData(df=self.df, label=label)
@@ -255,16 +274,23 @@ class BiologicLoader(BaseLoader):
         except Exception as e:
             raise ValueError(f"Failed to load data from {fpath}. Error: {e}")
 
-    def _safe_extract_metadata(self, mpr_file, attribute_name, default_value=None):
-        """Safely extract metadata attribute with warning if missing.
+    def _safe_extract_metadata(self, mpr_file, attribute_name: str, default_value=None):
+        """
+        Safely extract metadata attribute with warning if missing.
 
-        Args:
-            mpr_file: The MPR file object
-            attribute_name (str): Name of the attribute to extract
-            default_value: Value to return if attribute is missing
+        Parameters
+        ----------
+        mpr_file : BioLogic.MPRfile
+            The MPR file object.
+        attribute_name : str
+            Name of the attribute to extract.
+        default_value : any, optional
+            Value to return if attribute is missing.
 
-        Returns:
-            The attribute value or default_value if missing
+        Returns
+        -------
+        any
+            The attribute value or default_value if missing.
         """
         try:
             return getattr(mpr_file, attribute_name)
@@ -291,7 +317,7 @@ class CSVLoader(BaseLoader):
     it into an ECData object.
 
     Attributes:
-        df (Optional[pd.DataFrame]): The loaded data as a pandas DataFrame.
+        df (pd.DataFrame | None): The loaded data as a pandas DataFrame.
     """
 
     def __init__(self) -> None:
@@ -299,20 +325,29 @@ class CSVLoader(BaseLoader):
         self.df = None
 
     def load_data(
-        self, fpath: str, method: Optional[str] = None, label: Optional[str] = None
+        self, fpath: str, method: str | None = None, label: str | None = None
     ) -> ECData:
-        """Load data from a CSV file and return an ECData object.
+        """
+        Load data from a CSV file and return an ECData object.
 
-        Args:
-            fpath (str): The file path to the CSV data file.
-            method (Optional[str]): The method to use for loading the data. Defaults to None.
-            label (Optional[str]): An optional label for the data. Defaults to None.
+        Parameters
+        ----------
+        fpath : str
+            The file path to the CSV data file.
+        method : str, optional
+            The method to use for loading the data. Defaults to None.
+        label : str, optional
+            An optional label for the data. Defaults to None.
 
-        Raises:
-            ValueError: If the file cannot be processed or the file format is unsupported.
+        Raises
+        ------
+        ValueError
+            If the file cannot be processed or the file format is unsupported.
 
-        Returns:
-            ECData: An ECData object containing the loaded data.
+        Returns
+        -------
+        ECData
+            An ECData object containing the loaded data.
         """
         # Convert the file path to an absolute path and extract the file type
         self._convert_fpath(fpath)
@@ -327,7 +362,7 @@ class CSVLoader(BaseLoader):
 
             # If no label is provided, use the file path as the label
             if label is None:
-                label = self.fpath
+                label = self.name
 
             # Return the loaded data as an ECData object
             return ECData(df=self.df, label=label)
@@ -346,17 +381,24 @@ class LoaderFactory:
     """
 
     @staticmethod
-    def get_loader(fpath: str):
-        """Get the appropriate loader for the given file path.
+    def get_loader(fpath: str) -> BaseLoader:
+        """
+        Get the appropriate loader for the given file path.
 
-        Args:
-            fpath (str): The file path to the data file.
+        Parameters
+        ----------
+        fpath : str
+            The file path to the data file.
 
-        Raises:
-            ValueError: If the file format is unsupported.
+        Raises
+        ------
+        ValueError
+            If the file format is unsupported.
 
-        Returns:
-            BaseLoader: An instance of the appropriate loader class.
+        Returns
+        -------
+        BaseLoader
+            An instance of the appropriate loader class.
         """
         if fpath.endswith(".mpr"):
             return BiologicLoader()
