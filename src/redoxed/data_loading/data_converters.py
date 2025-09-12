@@ -1,5 +1,5 @@
 from redoxed.impedance import EISData
-from redoxed.DC import PolarisationData
+from redoxed.dc import PolarisationData
 import pandas as pd
 import numpy as np
 
@@ -56,7 +56,7 @@ def df_to_EISData(
 
 def df_to_PolarisationData(
     df: pd.DataFrame,
-    A: float,
+    A: float = 5,  # cm2
     pulse_index_range: tuple = (-5, None),
     label: str | None = None,
 ) -> PolarisationData:

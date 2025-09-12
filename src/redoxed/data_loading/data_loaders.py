@@ -5,6 +5,7 @@ from typing import Optional
 import yadg
 from galvani import BioLogic
 import json
+import warnings
 
 from redoxed.data_loading import ECData
 
@@ -156,10 +157,18 @@ class BiologicLoader(BaseLoader):
                     try:
                         mpr_file = BioLogic.MPRfile(fpath)
                         self.df = pd.DataFrame(mpr_file.data)
-                        metadata_dict = {}
-                        metadata_dict["startdate"] = mpr_file.startdate
-                        metadata_dict["enddate"] = mpr_file.enddate
-                        metadata_dict["modules"] = mpr_file.modules
+
+                        metadata_dict = {
+                            "timestamp": self._safe_extract_metadata(
+                                mpr_file, "timestamp"
+                            ),  # seems that timestamp will only be available once the program in EC-lab is finished, but it does represent the starttime of the experiment
+                            "startdate": self._safe_extract_metadata(
+                                mpr_file, "startdate"
+                            ),
+                            "enddate": self._safe_extract_metadata(mpr_file, "enddate"),
+                            "modules": self._safe_extract_metadata(mpr_file, "modules"),
+                        }
+
                         self.metadata = metadata_dict
                     except Exception as e:
                         raise ValueError(
@@ -168,7 +177,7 @@ class BiologicLoader(BaseLoader):
                         )
                 elif (
                     method == "yadg"
-                ):  # generally has more complete metadata and other data within the file
+                ):  # generally has more complete metadata and other data within the file, but it is less robust
                     try:
                         dt = yadg.extractors.extract(filetype="eclab.mpr", path=fpath)
                         self.metadata = dt.attrs
@@ -177,7 +186,7 @@ class BiologicLoader(BaseLoader):
                             self.metadata["original_metadata"]
                         )["log"][
                             "ole_timestamp"
-                        ]  # days since midnight December 30, 1899, not sure if is start or end
+                        ]  # days since midnight December 30, 1899
 
                         # Convert DataTree to DataFrame
                         data_dic: dict[str, pd.Series] = {}
@@ -245,6 +254,34 @@ class BiologicLoader(BaseLoader):
 
         except Exception as e:
             raise ValueError(f"Failed to load data from {fpath}. Error: {e}")
+
+    def _safe_extract_metadata(self, mpr_file, attribute_name, default_value=None):
+        """Safely extract metadata attribute with warning if missing.
+
+        Args:
+            mpr_file: The MPR file object
+            attribute_name (str): Name of the attribute to extract
+            default_value: Value to return if attribute is missing
+
+        Returns:
+            The attribute value or default_value if missing
+        """
+        try:
+            return getattr(mpr_file, attribute_name)
+        except AttributeError:
+            warnings.warn(
+                f"'{attribute_name}' not available in MPR file metadata",
+                UserWarning,
+                stacklevel=3,
+            )
+            return default_value
+        except Exception as e:
+            warnings.warn(
+                f"Could not extract '{attribute_name}' from MPR file: {e}",
+                UserWarning,
+                stacklevel=3,
+            )
+            return default_value
 
 
 class CSVLoader(BaseLoader):

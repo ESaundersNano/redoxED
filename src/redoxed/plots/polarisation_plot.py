@@ -6,7 +6,7 @@ from matplotlib.ticker import MultipleLocator, AutoMinorLocator, LogLocator
 from pathlib import Path
 import warnings
 
-from redoxed.DC import PolarisationData
+from redoxed.dc import PolarisationData
 
 
 class PolarisationPlot:
