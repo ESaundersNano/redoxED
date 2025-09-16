@@ -1,5 +1,5 @@
 from redoxed.impedance import EISData
-from redoxed.dc import PolarisationData
+from redoxed.dc import PolarisationData, CyclingData
 import pandas as pd
 import numpy as np
 
@@ -52,6 +52,41 @@ def df_to_EISData(
 
     # Create and return an instance of EISData
     return EISData(Z, f, label=label)
+
+
+def df_to_CyclingData(
+    df: pd.DataFrame,
+    label: str | None = None,
+) -> CyclingData:
+    """Convert a DataFrame to a CyclingData object. Specific to Biologic GCPL data format/default units and not intended to be flexible to other formats.
+
+    Args:
+        df (pd.DataFrame): _description_
+        label (str | None, optional): _description_. Defaults to None.
+
+    Returns:
+        CyclingData: _description_
+    """
+    # extract raw data
+    V_cell = df["Ewe/V"].to_numpy()
+    time = df["time/s"].to_numpy()
+    dq = df["dq/mA.h"].to_numpy() * 3.6  # convert to Coulombs
+
+    # create cycles
+    cycle_number = df["half cycle"] // 2
+    cycle_number = (
+        cycle_number + 1
+    )  # makes cycle 0 cycle 1 etc from Biologic GCPL default
+
+    # unused quantities for now
+    # Ns (sequence number) doesn't tell you about current within a step
+    # control/V/mA is sometimes out of sync with data, but rest of quantities are correct according to what dq/mA.h is doing. Notably, seems to change to next control in the last few indices before an Ns change
+    # Q charge/discharge/mA.h is cumulative in a half cycle
+    # (Q-Qo)/mA.h is the cumulative charge over the whole operation so tracks how much has been lost over cycling
+
+    return CyclingData.from_V_t_dq_cycle(
+        V_cell=V_cell, time=time, dq=dq, cycle_number=cycle_number, label=label
+    )
 
 
 def df_to_PolarisationData(

@@ -8,10 +8,10 @@ from redoxed.data_loading import ECData
 
 class GenericPlot(BasePlot):
     """
-    Generic plotter for ECData DataFrame columns.
+    Generic plotter for DataFrame columns.
 
     Plots y vs x and optionally y2 vs x on a twinned axis.
-    Multiple ECData objects can be added to the same plot.
+    Multiple DataFrame objects can be added to the same plot.
 
     Parameters
     ----------
@@ -41,32 +41,32 @@ class GenericPlot(BasePlot):
 
     def add_plot(
         self,
-        ec_data: ECData,
+        df: pd.DataFrame,
         label: str | None = None,
         color1: str | None = None,
         color2: str | None = None,
         **kwargs,
     ):
         """
-        Add ECData to the plot.
+        Add DataFrame to the plot.
 
         Args:
-            ec_data (ECData): The ECData object to plot.
+            df (pd.DataFrame): The DataFrame to plot.
             label (str | None): Label for the plot. If None, uses the data's label.
             color1 (str | None): Color for primary y-axis data. If None, uses default cycle.
             color2 (str | None): Color for secondary y-axis data. If None, uses default cycle.
             **kwargs: Additional arguments passed to matplotlib plot function.
         """
         if label is None:
-            label = ec_data.label
+            label = "data"
 
         # Validate columns exist
         required_cols = [self.x_col, self.y_col]
         if self.y2_col:
             required_cols.append(self.y2_col)
-        missing_cols = [col for col in required_cols if col not in ec_data.df.columns]
+        missing_cols = [col for col in required_cols if col not in df.columns]
         if missing_cols:
-            available_cols = list(ec_data.df.columns)
+            available_cols = list(df.columns)
             raise ValueError(
                 f"Column(s) {missing_cols} not found. Available columns: {available_cols}"
             )
@@ -85,8 +85,8 @@ class GenericPlot(BasePlot):
         if color1:
             plot_kwargs["color"] = color1
         self.ax.plot(
-            ec_data.df[self.x_col],
-            ec_data.df[self.y_col],
+            df[self.x_col],
+            df[self.y_col],
             label=f"{label} ({self.y_col})",
             **plot_kwargs,
         )
@@ -97,8 +97,8 @@ class GenericPlot(BasePlot):
             if color2:
                 plot_kwargs_2["color"] = color2
             self.ax2.plot(
-                ec_data.df[self.x_col],
-                ec_data.df[self.y2_col],
+                df[self.x_col],
+                df[self.y2_col],
                 label=f"{label} ({self.y2_col})",
                 **plot_kwargs_2,
             )

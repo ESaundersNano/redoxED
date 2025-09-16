@@ -12,7 +12,12 @@ import matplotlib.pyplot as plt
 
 from redoxed.impedance import EISData
 from redoxed.dc import PolarisationData
-from redoxed.data_loading.data_converters import df_to_EISData, df_to_PolarisationData
+from redoxed.dc import CyclingData
+from redoxed.data_loading.data_converters import (
+    df_to_EISData,
+    df_to_PolarisationData,
+    df_to_CyclingData,
+)
 
 
 class ECData:
@@ -131,6 +136,24 @@ class ECData:
             EISData: The converted electrochemical impedance spectroscopy data.
         """
         return converter(self.df, self.label, **kwargs)
+
+    def to_CyclingData(
+        self,
+        converter: Callable[[pd.DataFrame, str, Any], CyclingData] = df_to_CyclingData,
+        **kwargs: Any,
+    ) -> CyclingData:
+        """
+        Convert the electrochemical data to CyclingData format.
+
+        Args:
+            converter (Callable[[pd.DataFrame, str, Any], CyclingData]): Function to convert
+                DataFrame to CyclingData. Defaults to df_to_CyclingData.
+            **kwargs: Additional keyword arguments passed to the converter function.
+
+        Returns:
+            CyclingData: The converted cycling data.
+        """
+        return converter(df=self.df, label=self.label, **kwargs)
 
     def to_PolarisationData(
         self,
