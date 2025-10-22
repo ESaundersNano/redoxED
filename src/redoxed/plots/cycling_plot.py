@@ -89,3 +89,18 @@ class EfficiencyPlot(BasePlot):
         self.ax2.plot(x, j, **kwargs)
         if j_in_legend:
             self.ax.plot(np.nan, np.nan, **kwargs)  # make so appears in legend
+
+    def add_Q_discharge(
+        self,
+        x: np.ndarray,
+        Q_discharge: np.ndarray,
+        Q_in_legend: bool = True,
+        **kwargs: Any,
+    ) -> None:
+        if self.ax2 is None:
+            self.ax2 = self.ax.twinx()
+            self.ax2.set_ylabel(r"$Q$ / $\mathrm{mAh}$")
+            self.ax2.grid(False)
+        self.ax2.plot(x, Q_discharge, **kwargs)
+        if Q_in_legend:
+            self.ax.plot(np.nan, np.nan, **kwargs)  # make so appears in legend

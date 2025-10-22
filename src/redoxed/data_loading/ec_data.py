@@ -117,7 +117,9 @@ class ECData:
             raise ValueError(
                 f"Column '{col}' not found. Available columns: {available_cols}"
             )
-        return self.df[self.df[col].apply(condition)]
+        return self.df[
+            self.df[col].apply(condition)
+        ].copy()  # return copy rather than a view
 
     def to_EISData(
         self,
