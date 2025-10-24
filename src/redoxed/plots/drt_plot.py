@@ -65,6 +65,8 @@ class DRTPlot(BasePlot):
 
         This creates a twin x-axis showing the characteristic frequency
         fc = 1/(2π·τ) corresponding to the time constants.
+
+        Should be done after setting the main x-axis limits.
         """
         # Clear the existing ax_top if it exists
         if self.ax_top is not None:

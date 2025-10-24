@@ -187,11 +187,6 @@ class BasePlot(ABC):
         if number_y is not None:
             self.ax.yaxis.set_minor_locator(AutoMinorLocator(number_y))
 
-    def show(self) -> None:
-        """Display the plot in the current output."""
-        plt.figure(self.fig.number)
-        plt.show()
-
     def save(self, filename: str, **kwargs: Any) -> None:
         """
         Save the plot to a file.

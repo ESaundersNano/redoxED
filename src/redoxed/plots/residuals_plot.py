@@ -55,7 +55,7 @@ class ResidualsPlot(BasePlot):
     def add_plot(
         self,
         f: np.ndarray,
-        residual: np.ndarray,
+        residuals: np.ndarray,
         label: Optional[str] = None,
         **kwargs: Any,
     ) -> None:
@@ -64,11 +64,11 @@ class ResidualsPlot(BasePlot):
 
         Args:
             f (np.ndarray): Frequency array.
-            residual (np.ndarray): Residual values array.
+            residuals (np.ndarray): Residual values array.
             label (Optional[str]): Label for the plot. Defaults to "residual".
             **kwargs: Additional arguments passed to matplotlib plot function.
         """
         if label is None:
-            label = "residual"
+            label = "residuals"
         # Use direct matplotlib call
-        self.ax.plot(f, residual, label=label, **kwargs)
+        self.ax.plot(f, residuals, label=label, **kwargs)

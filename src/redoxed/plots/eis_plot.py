@@ -46,7 +46,7 @@ class NyquistPlot(BasePlot):
 
         # Set labels with proper LaTeX formatting - LaTeX preference already set globally
         self.ax.set_xlabel(r"$Z^{\prime}$ / $\Omega$")
-        self.ax.set_ylabel(r"$Z^{\prime\prime}$ / $\Omega$")
+        self.ax.set_ylabel(r"$-Z^{\prime\prime}$ / $\Omega$")
 
     def add_plot(
         self, eis_data: EISData, label: str | None = None, **kwargs: Any

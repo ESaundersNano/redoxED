@@ -4,6 +4,7 @@ figure.dpi: 300
 
 # Font settings
 font.size: 10
+axes.labelsize: 10
 
 # Grid settings
 axes.grid: False
