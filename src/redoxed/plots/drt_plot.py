@@ -23,13 +23,13 @@ class DRTPlot(BasePlot):
     """
 
     def __init__(
-        self, fc_axis: bool = True, usetex: bool | None = None, **kwargs: Any
+        self, fc_axis: bool = False, usetex: bool | None = None, **kwargs: Any
     ) -> None:
         """
         Initialize a DRT plot.
 
         Args:
-            fc_axis (bool): Whether to add characteristic frequency axis. Defaults to True.
+            fc_axis (bool): Whether to add characteristic frequency axis. Defaults to False.
             usetex (bool | None): Whether to use LaTeX rendering.
                                    If None, uses global config setting.
             **kwargs: Additional arguments passed to plt.subplots().
