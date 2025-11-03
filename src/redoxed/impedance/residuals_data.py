@@ -17,6 +17,10 @@ class ResidualsData:
         residuals_im: np.ndarray | None = None,
         residuals_re_rel: np.ndarray | None = None,
         residuals_im_rel: np.ndarray | None = None,
+        residuals_mag: np.ndarray | None = None,
+        residuals_phase: np.ndarray | None = None,
+        residuals_mag_rel: np.ndarray | None = None,
+        residuals_phase_rel: np.ndarray | None = None,
         label: str | None = None,
     ):
         self.f = f
@@ -26,6 +30,10 @@ class ResidualsData:
         self.residuals_im = residuals_im
         self.residuals_re_rel = residuals_re_rel
         self.residuals_im_rel = residuals_im_rel
+        self.residuals_mag = residuals_mag
+        self.residuals_phase = residuals_phase
+        self.residuals_mag_rel = residuals_mag_rel
+        self.residuals_phase_rel = residuals_phase_rel
         self.label = label
 
     @classmethod
@@ -34,7 +42,7 @@ class ResidualsData:
         Calculate residuals from two EISData objects.
         observed: EISData (experimental or measured)
         predicted: EISData (model or fit)
-        Returns ResidualsData with all residuals calculated.
+        Returns ResidualsData with all residuals calculated, including magnitude and phase (degrees).
         """
         f = getattr(observed, "f", None)
         Z_obs = getattr(observed, "Z", None)
@@ -45,9 +53,13 @@ class ResidualsData:
         residuals_re = np.real(residuals)
         residuals_im = np.imag(residuals)
         abs_Z_obs = np.abs(Z_obs)
+        residuals_mag = np.abs(Z_obs) - np.abs(Z_pred)
+        residuals_phase = np.angle(Z_obs, deg=True) - np.angle(Z_pred, deg=True)
         residuals_rel = 100 * residuals / abs_Z_obs
         residuals_re_rel = 100 * residuals_re / abs_Z_obs
         residuals_im_rel = 100 * residuals_im / abs_Z_obs
+        residuals_mag_rel = 100 * residuals_mag / abs_Z_obs
+        residuals_phase_rel = 100 * residuals_phase / np.angle(Z_obs, deg=True)
         return cls(
             f=f,
             residuals=residuals,
@@ -56,6 +68,10 @@ class ResidualsData:
             residuals_im=residuals_im,
             residuals_re_rel=residuals_re_rel,
             residuals_im_rel=residuals_im_rel,
+            residuals_mag=residuals_mag,
+            residuals_phase=residuals_phase,
+            residuals_mag_rel=residuals_mag_rel,
+            residuals_phase_rel=residuals_phase_rel,
             label=label,
         )
 
@@ -68,7 +84,11 @@ class ResidualsData:
             f"residuals_re={'set' if self.residuals_re is not None else 'None'}, "
             f"residuals_im={'set' if self.residuals_im is not None else 'None'}, "
             f"residuals_re_rel={'set' if self.residuals_re_rel is not None else 'None'}, "
-            f"residuals_im_rel={'set' if self.residuals_im_rel is not None else 'None'})"
+            f"residuals_im_rel={'set' if self.residuals_im_rel is not None else 'None'}, "
+            f"residuals_mag={'set' if self.residuals_mag is not None else 'None'}, "
+            f"residuals_phase={'set' if self.residuals_phase is not None else 'None'}, "
+            f"residuals_mag_rel={'set' if self.residuals_mag_rel is not None else 'None'}, "
+            f"residuals_phase_rel={'set' if self.residuals_phase_rel is not None else 'None'})"
         )
 
     def _validate(self) -> None:
@@ -84,6 +104,10 @@ class ResidualsData:
             self.residuals_im,
             self.residuals_re_rel,
             self.residuals_im_rel,
+            self.residuals_mag,
+            self.residuals_phase,
+            self.residuals_mag_rel,
+            self.residuals_phase_rel,
         ]
         lengths = [arr.shape[0] for arr in arrays if arr is not None]
         if lengths and not all(l == lengths[0] for l in lengths):

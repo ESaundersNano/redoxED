@@ -19,6 +19,7 @@ class EISData:
     Z_im: np.ndarray
     Z_mag: np.ndarray
     Z_phase: np.ndarray
+    Z_phase_deg: np.ndarray
     label: str | None
 
     def __init__(self, Z: np.ndarray, f: np.ndarray, label: str = None) -> None:
@@ -50,6 +51,7 @@ class EISData:
         self.Z_im = self.Z.imag
         self.Z_mag = np.abs(self.Z)
         self.Z_phase = np.angle(self.Z)
+        self.Z_phase_deg = np.angle(self.Z, deg=True)
 
     def _validate(self) -> None:
         """

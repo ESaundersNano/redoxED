@@ -23,7 +23,11 @@ class ResidualsPlot(BasePlot):
     """
 
     def __init__(
-        self, usetex: bool | None = None, mode: str = "absolute", **kwargs: object
+        self,
+        usetex: bool | None = None,
+        mode: str = "absolute",
+        Z_rep="cartesian",
+        **kwargs: object,
     ) -> None:
         """
         Initialize a residuals plot.
@@ -34,9 +38,12 @@ class ResidualsPlot(BasePlot):
             **kwargs: Additional arguments passed to plt.subplots().
         """
         self.mode = mode
+        self.Z_rep = Z_rep
         super().__init__(usetex=usetex, **kwargs)
         if mode not in ("absolute", "relative"):
             raise ValueError("mode must be 'absolute' or 'relative'")
+        if Z_rep not in ("cartesian", "polar"):
+            raise ValueError("Z_rep must be 'cartesian' or 'polar'")
 
     def _configure_axes(self) -> None:
         """Configure axes specifically for residuals plots."""
@@ -58,8 +65,14 @@ class ResidualsPlot(BasePlot):
         self.ax.set_xlabel(r"$f$ / $\mathrm{Hz}$")
         if self.mode == "absolute":
             self.ax.set_ylabel(r"$\mathrm{Residual}$ / $\Omega$")
+            if self.Z_rep == "polar":
+                self.ax_phase = self.ax.twinx()
+                self.ax_phase.set_ylabel(r"Phase / Degrees")
         else:
             self.ax.set_ylabel(r"$\mathrm{Residual}$ / $\%$")
+            if self.Z_rep == "polar":
+                self.ax_phase = self.ax.twinx()
+                self.ax_phase.set_ylabel(r"Phase / $\%$")
 
     def add_plot(
         self,
@@ -80,21 +93,53 @@ class ResidualsPlot(BasePlot):
         if label is None:
             label = getattr(residuals_data, "label", "residuals")
         f = residuals_data.f
-        if self.mode == "absolute":
-            y_re = residuals_data.residuals_re
-            y_im = residuals_data.residuals_im
-        else:
-            y_re = (
-                residuals_data.residuals_re_rel
-                if residuals_data.residuals_re_rel is not None
-                else None
-            )
-            y_im = (
-                residuals_data.residuals_im_rel
-                if residuals_data.residuals_im_rel is not None
-                else None
-            )
-        if y_re is not None:
-            self.ax.plot(f, y_re, label=label + " (Re)", marker="s", **kwargs)
-        if y_im is not None:
-            self.ax.plot(f, y_im, label=label + " (Im)", marker="^", **kwargs)
+
+        if self.Z_rep == "cartesian":
+            if self.mode == "absolute":
+                y_re = residuals_data.residuals_re
+                y_im = residuals_data.residuals_im
+            else:
+                y_re = (
+                    residuals_data.residuals_re_rel
+                    if residuals_data.residuals_re_rel is not None
+                    else None
+                )
+                y_im = (
+                    residuals_data.residuals_im_rel
+                    if residuals_data.residuals_im_rel is not None
+                    else None
+                )
+            if y_re is not None:
+                self.ax.plot(f, y_re, label=label + " (Re)", marker="s", **kwargs)
+            if y_im is not None:
+                self.ax.plot(f, y_im, label=label + " (Im)", marker="^", **kwargs)
+        elif self.Z_rep == "polar":
+
+            if self.mode == "absolute":
+                y_mag = residuals_data.residuals_mag
+                y_phase = residuals_data.residuals_phase
+            else:
+                y_mag = (
+                    residuals_data.residuals_mag_rel
+                    if residuals_data.residuals_mag_rel is not None
+                    else None
+                )
+                y_phase = (
+                    residuals_data.residuals_phase_rel
+                    if residuals_data.residuals_phase_rel is not None
+                    else None
+                )
+            if y_mag is not None:
+                self.ax.plot(f, y_mag, label=label + " (Mag)", marker="s", **kwargs)
+            if y_phase is not None:
+                self.ax_phase.plot(
+                    f, y_phase, label=label + " (Phase)", marker="^", **kwargs
+                )
+                # make phase appear in legend
+                self.ax.plot(
+                    np.nan,
+                    np.nan,
+                    label=f"{label} (Phase)",
+                    marker="^",
+                    **kwargs,
+                )

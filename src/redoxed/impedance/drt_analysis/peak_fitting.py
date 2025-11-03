@@ -53,7 +53,7 @@ def find_DRT_peaks(
     else:
         raise TypeError("num_peaks must be int or None")
 
-    tau = DRTData_object.tau.copy()
+    tau = DRTData_object.tau.copy().astype(np.float64)
     log_tau = np.log(tau)
 
     gamma = DRTData_object.gamma.copy()
@@ -288,7 +288,7 @@ def _residual(
     Residual function for minimization: difference between fit and data.
     Uses absolute residuals to avoid divide-by-zero issues.
     """
-    return _function(log_tau, parameters, peak_type) - gamma
+    return np.abs(_function(log_tau, parameters, peak_type) - gamma)
 
 
 @dataclass(frozen=True)
@@ -621,6 +621,8 @@ def fit_DRT_peaks(
         "chisqr": fit.chisqr,
         "redchi": fit.redchi,
         "nfev": fit.nfev,
+        "method": fit.method,
+        "kws sent": fit.call_kws,
     }
 
     # Organize peak parameters by peak index
@@ -632,7 +634,7 @@ def fit_DRT_peaks(
             if peak_key not in peak_dict:
                 peak_dict[peak_key] = {}
                 peak_dict[peak_key]["peak_type"] = peak_type
-                peak_dict[peak_key]["peak_number"] = idx
+                peak_dict[peak_key]["peak_number"] = int(idx)
             peak_dict[peak_key][prop] = v
 
     drt_peaks: List[DRTPeak] = []

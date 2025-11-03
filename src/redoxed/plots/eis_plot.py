@@ -65,6 +65,78 @@ class NyquistPlot(BasePlot):
         self.ax.plot(eis_data.Z_re, -eis_data.Z_im, label=label, **kwargs)
 
 
+# --- BodePlot class ---
+class BodePlot(BasePlot):
+    """
+    Bode plot for electrochemical impedance spectroscopy data.
+
+    Plots magnitude (|Z|) and phase (degrees) vs frequency (log10 scale).
+    Magnitude is shown on the left y-axis (squares), phase on the right y-axis (triangles).
+    """
+
+    def __init__(self, usetex: bool | None = None, **kwargs: Any) -> None:
+        """
+        Initialize a Bode plot.
+
+        Args:
+            usetex (bool | None): Whether to use LaTeX rendering.
+                                    If None, uses global config setting.
+            **kwargs: Additional arguments passed to plt.subplots().
+        """
+        super().__init__(usetex=usetex, **kwargs)
+
+    def _configure_axes(self) -> None:
+        """Configure axes specifically for Bode plots."""
+        self.ax.set_xscale("log")
+        self.ax.set_xlabel(r"$f$ / Hz")
+        self.ax.set_ylabel(r"$|Z|$ / $\Omega$")
+        # Create secondary y-axis for phase
+        self.ax_phase = self.ax.twinx()
+        self.ax_phase.set_ylabel(r"Phase / Degrees")
+
+    def add_plot(
+        self, eis_data: EISData, label: str | None = None, **kwargs: Any
+    ) -> None:
+        """
+        Add EIS data to the Bode plot.
+
+        Args:
+            eis_data (EISData): The EIS data object to plot.
+            label (str | None): Label for the plot. If None, uses the data's label.
+            **kwargs: Additional arguments passed to matplotlib plot function.
+        """
+        if label is None:
+            label = eis_data.label
+        # Magnitude plot (squares)
+        self.ax.plot(
+            eis_data.f,
+            eis_data.Z_mag,
+            label=f"{label} Magnitude",
+            marker="s",
+            **kwargs,
+        )
+        # Phase plot in degrees (triangles)
+        self.ax_phase.plot(
+            eis_data.f,
+            eis_data.Z_phase_deg,
+            label=f"{label} Phase",
+            marker="^",
+            **kwargs,
+        )
+        # make phase appear in legend
+        self.ax.plot(
+            np.nan,
+            np.nan,
+            label=f"{label} Phase",
+            marker="^",
+            **kwargs,
+        )
+
+        # # Add legends to both axes
+        # self.ax.legend(loc="upper left")
+        # self.ax_phase.legend(loc="upper right")
+
+
 # def plot_bode(self, **kwargs):
 
 #     """

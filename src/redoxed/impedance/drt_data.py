@@ -9,6 +9,10 @@ from nanodrt.calculators import ImpedanceCalculator
 from nanodrt.radialbasisfunctions import GaussianRBF
 from nanodrt.optimizers import ImpedanceOptimizer
 import jax.numpy as jnp
+from typing import List, Tuple, Dict
+from numpy.typing import NDArray
+from numpy import float64
+from scipy.integrate import trapezoid
 
 
 class DRTData:
@@ -49,3 +53,26 @@ class DRTData:
             raise ValueError("tau and gamma must be 1D arrays.")
         if self.tau.size == 0 or self.gamma.size == 0:
             raise ValueError("tau and gamma arrays must not be empty.")
+
+    def get_pol_resistance(self) -> float64:
+        """
+        Calculate the peak area (Zp) for this spectrum.
+        Parameters
+        ----------
+
+
+        Returns
+        -------
+        float64
+            Area under the spectrum (Zp value).
+        """
+        tau = self.tau.copy()
+        gamma = self.gamma.copy()
+        # Ensure tau is in ascending order
+        if not np.all(np.diff(tau) > 0):
+            sort_idx = np.argsort(tau)
+            tau = tau[sort_idx]
+            gamma = gamma[sort_idx]
+        ln_tau = np.log(tau)
+        pol_resistance = np.trapezoid(gamma, ln_tau)
+        return pol_resistance
