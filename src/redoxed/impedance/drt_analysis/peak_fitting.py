@@ -102,6 +102,7 @@ def _generate_parameters(
     peak_type: str,
     skew: bool,
     log_tau0_bound: float | None = None,
+    assym_bound: float | None = None,
 ) -> Tuple[Parameters, int]:
     """
     Generate lmfit.Parameters for each peak, with bounds and initial guesses.
@@ -116,6 +117,10 @@ def _generate_parameters(
         Whether to allow skew parameter to vary.
     log_tau0_bound : float or None, optional
         Bound for log_tau0 parameter. If None, uses 1% bounds.
+    assym_bound : float or None, optional
+        Bound for asymmetry parameters. If None, uses default bounds.
+        For HN: sets beta min to 1 - assym_bound.
+        For SG: sets upsilon bounds to [-assym_bound, +assym_bound].
 
     Returns
     -------
@@ -133,6 +138,16 @@ def _generate_parameters(
             raise ValueError("log_tau0_bound must be > 0")
     else:
         raise TypeError("log_tau0_bound must be float or None")
+
+    if assym_bound is None:
+        pass
+    elif isinstance(assym_bound, (float, int)):
+        if assym_bound < 0:
+            raise ValueError("assym_bound must be >= 0")
+        if assym_bound > 1:
+            raise ValueError("assym_bound must be <= 1")
+    else:
+        raise TypeError("assym_bound must be float or None")
 
     parameters: Parameters = Parameters()
     num_variables: int = 0
@@ -186,13 +201,22 @@ def _generate_parameters(
                 max=1.0,
             )
 
-            parameters.add(
-                name=f"beta_{i}",
-                value=1,
-                min=0.0,
-                max=1.0,
-                vary=skew,  # allow to vary if skew is permitted
-            )
+            if assym_bound is not None:
+                parameters.add(
+                    name=f"beta_{i}",
+                    value=1,
+                    min=1.0 - assym_bound,
+                    max=1.0,
+                    vary=skew,  # allow to vary if skew is permitted
+                )
+            else:
+                parameters.add(
+                    name=f"beta_{i}",
+                    value=1,
+                    min=0.0,
+                    max=1.0,
+                    vary=skew,  # allow to vary if skew is permitted
+                )
 
             num_variables += 4 if skew else 3
 
@@ -204,13 +228,22 @@ def _generate_parameters(
                 max=2.0 * gamma_pos,  # limit to 2*peak height
             )
 
-            parameters.add(
-                name=f"upsilon_{i}",
-                value=0.0,
-                min=-1.0,
-                max=1.0,
-                vary=skew,  # allow to vary if skew is permitted
-            )
+            if assym_bound is not None:
+                parameters.add(
+                    name=f"upsilon_{i}",
+                    value=0.0,
+                    min=-assym_bound,
+                    max=assym_bound,
+                    vary=skew,  # allow to vary if skew is permitted
+                )
+            else:
+                parameters.add(
+                    name=f"upsilon_{i}",
+                    value=0.0,
+                    min=-1.0,
+                    max=1.0,
+                    vary=skew,  # allow to vary if skew is permitted
+                )
 
             parameters.add(
                 name=f"sigma_{i}",
@@ -511,6 +544,7 @@ def fit_DRT_peaks(
     peak_type: str = "HN",
     skew: bool = True,
     log_tau0_bound: float | None = 0.1,
+    assym_bound: float | None = None,
     minimizer_settings: dict = None,
 ) -> DRTPeaks:
     """
@@ -529,7 +563,12 @@ def fit_DRT_peaks(
     skew : bool, optional
         Whether to allow skew parameter to vary. Default is True.
     log_tau0_bound : float or None, optional
-        Bound for log_tau0 parameter. Default is 0.1.
+        Bound for log_tau0 parameter. Default is 0.1 (roughly 10 %).
+    assym_bound : float or None, optional
+        Bound for asymmetry parameters. If None, uses default bounds.
+        For HN: sets beta min to 1 - assym_bound.
+        For SG: sets upsilon bounds to [-assym_bound, +assym_bound].
+        Must be <= 1.
     minimizer_settings : dict or None, optional
         Dictionary with minimizer method and fit_kws. E.g. {"method": "leastsq", "fit_kws": {...}}
 
@@ -584,7 +623,11 @@ def fit_DRT_peaks(
     parameters: Parameters
     num_variables: int
     parameters, num_variables = _generate_parameters(
-        peaks, peak_type=peak_type, skew=skew, log_tau0_bound=log_tau0_bound
+        peaks,
+        peak_type=peak_type,
+        skew=skew,
+        log_tau0_bound=log_tau0_bound,
+        assym_bound=assym_bound,
     )
 
     # safeguard that peak fit isn't overfitting (most likely in the case that neither num_peaks nor peak_positions is provided)
@@ -593,7 +636,11 @@ def fit_DRT_peaks(
         peaks.pop()
         peaks.sort(key=lambda t: t[0])
         parameters, num_variables = _generate_parameters(
-            peaks, peak_type=peak_type, skew=skew, log_tau0_bound=log_tau0_bound
+            peaks,
+            peak_type=peak_type,
+            skew=skew,
+            log_tau0_bound=log_tau0_bound,
+            assym_bound=assym_bound,
         )
 
     # Set minimizer defaults
