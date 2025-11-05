@@ -14,6 +14,7 @@ Important Notes:
 
 # Global configuration variables
 USE_LATEX: bool = False
+QP_SOLVER: str = "cvxopt"  # Options: "cvxopt" (default), "kvxopt"
 
 
 def set_latex_mode(use_latex: bool) -> None:
@@ -32,6 +33,19 @@ def set_latex_mode(use_latex: bool) -> None:
     USE_LATEX = use_latex
 
 
+def set_qp_solver(solver: str) -> None:
+    """
+    Set the QP solver backend.
+
+    Args:
+        solver (str): "cvxopt" or "kvxopt"
+    """
+    global QP_SOLVER
+    if solver not in ("cvxopt", "kvxopt"):
+        raise ValueError("QP_SOLVER must be 'cvxopt' or 'kvxopt'")
+    QP_SOLVER = solver
+
+
 def get_config() -> dict:
     """
     Get current configuration settings.
@@ -41,10 +55,12 @@ def get_config() -> dict:
     """
     return {
         "USE_LATEX": USE_LATEX,
+        "QP_SOLVER": QP_SOLVER,
     }
 
 
 def reset_config() -> None:
     """Reset all configuration to default values."""
-    global USE_LATEX
+    global USE_LATEX, QP_SOLVER
     USE_LATEX = False
+    QP_SOLVER = "cvxopt"

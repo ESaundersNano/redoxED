@@ -14,10 +14,14 @@ from numpy import (
     min as array_min,
 )
 
-from typing import List, Tuple
+from typing import List, Dict, Any
 from numpy.typing import NDArray, float64
 
-from numpy import array
+from multiprocessing import cpu_count
+from os import environ
+from numpy import (
+    __config__ as numpy_config,
+)
 
 
 def _nearest_positive_definite(A: NDArray) -> NDArray:
@@ -71,3 +75,76 @@ def _is_positive_definite(matrix: NDArray) -> bool:
         return True
     except LinAlgError:
         return False
+
+
+NUM_PROCS_OVERRIDE: int = -1
+
+
+def get_default_num_procs() -> int:
+    """
+    Taken from pyimpspec in case I want multiprocessing in DRT solver.
+
+    Get the default number of parallel processes that pyimpspec would try to use.
+    NumPy may be using libraries that are multithreaded, which can lead to poor performance or system responsiveness when combined with pyimpspec's use of multiple processes.
+    This function attempts to return a reasonable number of processes depending on the detected libraries (and relevant environment variables):
+
+    - OpenBLAS (``OPENBLAS_NUM_THREADS``)
+    - MKL (``MKL_NUM_THREADS``)
+
+    If none of the libraries listed above are detected because some other library is used, then the value returned by ``multiprocessing.cpu_count()`` is used.
+
+    Returns
+    -------
+    int
+    """
+    if NUM_PROCS_OVERRIDE > 0:
+        return NUM_PROCS_OVERRIDE
+    num_cores: int = cpu_count()
+
+    multithreaded: Dict[str, List[str]] = {
+        "openblas": ["OPENBLAS_NUM_THREADS", "GOTO_NUM_THREADS", "OMP_NUM_THREADS"],
+        "mkl": ["MKL_NUM_THREADS"],
+    }
+    libraries = set()
+
+    if hasattr(numpy_config, "CONFIG"):
+        key: str
+        obj: Any
+        for key, obj in numpy_config.CONFIG.items():
+            if not isinstance(obj, dict):
+                continue
+
+            blas_config: dict = obj.get("blas", {})
+            if not blas_config or not blas_config.get("found", False):
+                continue
+
+            lib: str
+            for lib in multithreaded:
+                if lib in blas_config.get("name", ""):
+                    libraries.add(lib)
+
+    name: str
+    for name in libraries:
+        envs: List[str]
+        for lib, envs in multithreaded.items():
+            if lib in name:
+                num_threads: int = -1
+                for env in envs:
+                    try:
+                        num_threads = int(environ.get(env, ""))
+                    except ValueError:
+                        continue
+                    else:
+                        break
+
+                if num_threads < 0:
+                    # Assume that the library will use as many threads as there
+                    # are cores available to the system.
+                    return 1
+                elif num_threads == 1:
+                    return num_cores
+                else:
+                    num_procs: int = num_cores // num_threads
+                    return num_procs if num_procs > 1 else 1
+
+    return num_cores
