@@ -1,4 +1,7 @@
 import numpy as np
+from numpy import float64, complex128
+from numpy.typing import NDArray
+import copy
 
 
 class EISData:
@@ -13,16 +16,18 @@ class EISData:
         label (str | None): Optional label for the dataset.
     """
 
-    Z: np.ndarray
-    f: np.ndarray
-    Z_re: np.ndarray
-    Z_im: np.ndarray
-    Z_mag: np.ndarray
-    Z_phase: np.ndarray
-    Z_phase_deg: np.ndarray
+    Z: NDArray[complex128]
+    f: NDArray[float64]
+    Z_re: NDArray[float64]
+    Z_im: NDArray[float64]
+    Z_mag: NDArray[float64]
+    Z_phase: NDArray[float64]
+    Z_phase_deg: NDArray[float64]
     label: str | None
 
-    def __init__(self, Z: np.ndarray, f: np.ndarray, label: str = None) -> None:
+    def __init__(
+        self, Z: NDArray[complex128], f: NDArray[float64], label: str = None
+    ) -> None:
         """
         Initializes the EISData object.
 
@@ -68,17 +73,11 @@ class EISData:
             raise ValueError("Z and f must be 1D arrays.")
         if self.Z.size == 0 or self.f.size == 0:
             raise ValueError("Z and f arrays must not be empty.")
-            #     # Check if data arrays are set
-
-        #     if self.Z_re is None or self.Z_im is None or self.f is None:
-        #         raise ValueError(
-        #             "The Real (Z_re), Imaginary (Z_im) impedance, and frequency (f) arrays must be provided."
-        #         )
-        #     # Check if frequencies are positive
-        #     if jnp.any(self.f <= 0):
-        # should probably check Z are complex and maybe even set type
-        #         raise ValueError("Frequencies (f) must be strictly positive.")
-        #     # Check for NaN or infinite values
+        try:
+            self.f = np.asarray(self.f, dtype=np.float64)
+            self.Z = np.asarray(self.Z, dtype=np.complex128)
+        except Exception as e:
+            raise ValueError("Failed to convert tau and gamma to float64.") from e
 
     def __repr__(self) -> str:
         """
@@ -109,6 +108,17 @@ class EISData:
         mask = self.Z_im < 0
         self.Z = self.Z[mask]
         self.f = self.f[mask]
+        self._calculate_z_quants()
+
+    def sort_frequency_descending(self) -> None:
+        """
+        Sorts the frequency array (self.f) in descending order and rearranges
+        the impedance array (self.Z) to match the new order.
+        """
+        # Get sorted indices for descending order
+        sorted_indices = np.argsort(self.f)[::-1]
+        self.f = self.f[sorted_indices]
+        self.Z = self.Z[sorted_indices]
         self._calculate_z_quants()
 
     def estimate_real_intercept(self) -> float:
@@ -144,3 +154,7 @@ class EISData:
         Z_re_intercept = Z_re1 - (Z_im1 * (Z_re2 - Z_re1)) / (Z_im2 - Z_im1)
 
         return Z_re_intercept
+
+    def copy(self):
+        """Return a deep copy of this EISData instance."""
+        return copy.deepcopy(self)

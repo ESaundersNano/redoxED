@@ -2,7 +2,7 @@ from scipy.integrate import quad, trapezoid
 import numpy as np
 
 
-def Z_from_DRT(f, gamma, tau=None, R0=0.0, L0=0.0, quad_opts=None):
+def Z_from_DRT(f, gamma, tau=None, R0=np.nan, L0=np.nan, C0=np.nan, quad_opts=None):
     """
     Reconstruct impedance Z_DRT(f) from DRT using either analytic or vectorized gamma.
 
@@ -19,12 +19,20 @@ def Z_from_DRT(f, gamma, tau=None, R0=0.0, L0=0.0, quad_opts=None):
         Ohmic resistance (default 0.0)
     L0 : float, optional
         Inductance (default 0.0)
-    quad_opts : dict, optional
-        Dictionary of options for scipy.integrate.quad. Supported keys:
-        - 'a', 'b': integration limits (default -50, 50)
-        - 'epsabs', 'epsrel': error tolerances
-        - 'limit': max subdivisions (default 100)
-        If a key is provided, its value will override the default. If not provided, defaults are used.
+    quad_opts : dict | None, optional
+        Dictionary of options to pass to scipy.integrate.quad for integrals.
+        May need to reduce a and b limits if getting integration warnings. Likely you just start getting numeric instability when interval is too large.
+        With typical peak sizes, limits of -20 to 5 are more than reasonable (1e-8 to 1e2 tau).
+        If None, uses:
+            {'epsabs': 1e-9, 'epsrel': 1e-9, 'limit': 100, 'a': -20, 'b': 20}
+        Valid keys:
+            - 'epsabs': Absolute error tolerance (default: 1e-9)
+            - 'epsrel': Relative error tolerance (default: 1e-9)
+            - 'limit': Maximum number of subintervals (default: 100)
+            - 'a': Lower integration limit (default: -50)
+            - 'b': Upper integration limit (default: 50)
+        Example:
+            quad_opts = {'epsabs': 1e-8, 'epsrel': 1e-8, 'limit': 200, 'a': -20, 'b': 5}
 
     Returns
     -------
@@ -40,7 +48,7 @@ def Z_from_DRT(f, gamma, tau=None, R0=0.0, L0=0.0, quad_opts=None):
     f = np.atleast_1d(f)
     Z_DRT = np.zeros(f.shape, dtype=complex)
     # Default quad options
-    default_opts = {"a": -50, "b": 50, "epsabs": 1e-9, "epsrel": 1e-9, "limit": 100}
+    default_opts = {"a": -20, "b": 20, "epsabs": 1e-9, "epsrel": 1e-9, "limit": 100}
     quad_opts = quad_opts or {}
     opts = {**default_opts, **quad_opts}
     a = opts["a"]
@@ -61,8 +69,7 @@ def Z_from_DRT(f, gamma, tau=None, R0=0.0, L0=0.0, quad_opts=None):
 
             real_integral, _ = quad(real_integrand, a, b, **quad_args)
             imag_integral, _ = quad(imag_integrand, a, b, **quad_args)
-            integral = real_integral + 1j * imag_integral
-            Z_DRT[i] = R0 + 1j * 2 * np.pi * fi * L0 + integral
+            Z_DRT[i] = real_integral + 1j * imag_integral
     else:
         if tau is None:
             raise ValueError("tau array must be provided when gamma is vectorized.")
@@ -74,5 +81,11 @@ def Z_from_DRT(f, gamma, tau=None, R0=0.0, L0=0.0, quad_opts=None):
         ln_tau = np.log(tau)
         for i, fi in enumerate(f):
             kernel = gamma / (1 + 1j * 2 * np.pi * fi * tau)
-            Z_DRT[i] = R0 + 1j * 2 * np.pi * fi * L0 + trapezoid(kernel, ln_tau)
+            Z_DRT[i] = trapezoid(kernel, ln_tau)
+    if not np.isnan(R0):
+        Z_DRT += R0
+    if not np.isnan(L0):
+        Z_DRT += 1j * 2 * np.pi * f * L0
+    if not np.isnan(C0):
+        Z_DRT += 1 / (1j * 2 * np.pi * f * C0)
     return Z_DRT if Z_DRT.size > 1 else Z_DRT[0]

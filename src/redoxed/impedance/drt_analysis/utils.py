@@ -1,9 +1,66 @@
 import numpy as np
+from numpy import float64, complex128
+from numpy.typing import NDArray
+
+
+def extend_logspace_f(f, new_f_min, new_f_max):
+    """
+    Extends a descending, uniformly log-spaced frequency vector to new limits,
+    continuing the same log spacing.
+
+    Parameters
+    ----------
+    f : np.ndarray
+        Original frequency vector (descending, uniformly log-spaced).
+    new_f_min : float
+        New minimum frequency (lowest value).
+    new_f_max : float
+        New maximum frequency (highest value).
+
+    Returns
+    -------
+    np.ndarray
+        Extended frequency vector, descending, uniformly log-spaced.
+    """
+    f = np.asarray(f)
+    if not np.all(np.diff(f) < 0):
+        raise ValueError("f must be in descending order.")
+
+    log_f = np.log10(f)
+    log_diffs = np.diff(log_f)
+    log_diff_mean = np.mean(log_diffs)
+    log_diff_std = np.std(log_diffs)
+    rel_std = log_diff_std / abs(log_diff_mean)
+    if rel_std > 0.01:
+        raise ValueError("f must be uniformly log-spaced (within tolerance).")
+    log_step = log_diff_mean
+
+    # Extend above (higher frequencies)
+    extra_high = []
+    next_log = np.log10(f[0]) - log_step
+    while 10**next_log <= new_f_max:
+        extra_high.append(10**next_log)
+        next_log -= log_step
+
+    # Extend below (lower frequencies)
+    extra_low = []
+    next_log = np.log10(f[-1]) + log_step
+    while 10**next_log >= new_f_min:
+        extra_low.append(10**next_log)
+        next_log += log_step
+
+    # Concatenate: extra_high (reversed) + original + extra_low
+    extended_f = np.concatenate([extra_high[::-1], f, extra_low])
+    return extended_f
 
 
 def HN_Z(
-    omega: float | np.ndarray, Z0: float, tau0: float, alpha: float, beta: float
-) -> complex | np.ndarray:
+    omega: float | NDArray[float64],
+    Z0: float64,
+    tau0: float64,
+    alpha: float64,
+    beta: float64,
+) -> complex | NDArray[complex128]:
     """
     Calculate the Havriliak-Negami impedance.
 
@@ -59,8 +116,12 @@ def HN_Z(
 
 
 def HN_DRT(
-    tau: float | np.ndarray, Z0: float, tau0: float, alpha: float, beta: float
-) -> float | np.ndarray:
+    tau: float | NDArray[float64],
+    Z0: float64,
+    tau0: float64,
+    alpha: float64,
+    beta: float64,
+) -> float | NDArray[float64]:
     """
     Calculate the Havriliak-Negami Distribution of Relaxation Times (DRT).
 
@@ -128,13 +189,129 @@ def HN_DRT(
     return gamma
 
 
+def GFLW_Z(
+    omega: float | NDArray[float64],
+    Z0: float64,
+    tau0: float64,
+    zeta: float64,
+) -> complex | NDArray[complex128]:
+    """
+    Calculate the generalized finite-length Warburg impedance.
+
+    Parameters
+    ----------
+    omega : float or np.ndarray
+        Angular frequency (rad/s)
+    Z0 : float
+        Characteristic impedance magnitude (Ohm)
+    tau0 : float
+        Characteristic time constant (s)
+    zeta : float
+        Exponent parameter (0 < zeta <= 0.5)
+
+    Returns
+    -------
+    complex or np.ndarray
+        Complex impedance Z(ω)
+
+    Notes
+    -----
+    Implements the generalized finite-length Warburg form:
+    Z(ω) = [Z0 / (jωτ0)^ζ] * tanh[(jωτ0)^ζ]
+    From:
+    Boukamp, B. A. Distribution (Function) of Relaxation Times, Successor to Complex Nonlinear Least Squares Analysis of Electrochemical Impedance Spectroscopy? J. Phys. Energy 2020, 2 (4), 042001. https://doi.org/10.1088/2515-7655/aba9e0.
+
+    """
+    # Enforce parameter bounds
+    if not (0 < zeta <= 0.5):
+        raise ValueError("zeta must be in (0, 0.5]")
+
+    # Convert to numpy array for consistent handling
+    omega = np.asarray(omega)
+
+    # Calculate x = (jωτ0)^ζ
+    x = (1j * omega * tau0) ** zeta
+
+    # Compute tanh(x)/x with stable handling at x=0 (limit is 1)
+    ratio = np.empty_like(x, dtype=np.complex128)
+    np.divide(np.tanh(x), x, out=ratio, where=x != 0)
+    ratio = np.where(x == 0, 1.0 + 0.0j, ratio)
+
+    # Calculate Z(ω)
+    Z = Z0 * ratio
+
+    return Z
+
+
+def GFLW_DRT(
+    tau: float | NDArray[float64],
+    Z0: float64,
+    tau0: float64,
+    zeta: float64,
+) -> float | NDArray[float64]:
+    """
+    Calculate the generalized finite-length Warburg Distribution of Relaxation Times (DRT).
+
+    Parameters
+    ----------
+    tau : float or np.ndarray
+        Time constant(s) (s)
+    Z0 : float
+        Characteristic impedance magnitude (Ohm)
+    tau0 : float
+        Characteristic time constant (s)
+    zeta : float
+        Exponent parameter (0 < zeta <= 0.5)
+
+    Returns
+    -------
+    float or np.ndarray
+        DRT γ(τ) (Ohm)
+
+    Notes
+    -----
+    Implements generalized finite-length Warburg DRT equations:
+        γ(τ) = (Z0 / π X) *
+            [sin(πζ)(1 - Y^2) - 2Y cos(πζ) sin(2X sin(πζ))] /
+            [1 + 2Y cos(2X sin(πζ)) + Y^2]
+    X = (τ0/τ)^ζ
+    Y = exp[-2X cos(πζ)]
+    From:
+    Boukamp, B. A. Distribution (Function) of Relaxation Times, Successor to Complex Nonlinear Least Squares Analysis of Electrochemical Impedance Spectroscopy? J. Phys. Energy 2020, 2 (4), 042001. https://doi.org/10.1088/2515-7655/aba9e0.
+
+    """
+    # Enforce parameter bounds
+    if not (0 < zeta <= 0.5):
+        raise ValueError("zeta must be in (0, 0.5]")
+
+    # Convert to numpy array for consistent handling
+    tau = np.asarray(tau)
+
+    # Calculate auxiliary variables
+    sin_pi_zeta = np.sin(np.pi * zeta)
+    cos_pi_zeta = np.cos(np.pi * zeta)
+    X = (tau0 / tau) ** zeta
+    Y = np.exp(-2 * X * cos_pi_zeta)
+
+    # Calculate second-fraction numerator and denominator terms
+    gamma_num = sin_pi_zeta * (1 - Y**2) - 2 * Y * cos_pi_zeta * np.sin(
+        2 * X * sin_pi_zeta
+    )
+    gamma_den = 1 + 2 * Y * np.cos(2 * X * sin_pi_zeta) + Y**2
+
+    # Calculate γ(τ) = (Z0/π) * (gamma_num/gamma_den)
+    gamma = (Z0 / (np.pi * X)) * (gamma_num / gamma_den)
+
+    return gamma
+
+
 def SG_DRT(
-    log_tau: float | np.ndarray,
-    height: float,
-    log_tau0: float,
-    upsilon: float,
-    sigma: float,
-) -> float | np.ndarray:
+    log_tau: float64 | NDArray[float64],
+    height: float64,
+    log_tau0: float64,
+    upsilon: float64,
+    sigma: float64,
+) -> float64 | NDArray[float64]:
     """
     Calculate the Skewed Gaussian Distribution of Relaxation Times (DRT).
 

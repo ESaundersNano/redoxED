@@ -1,13 +1,6 @@
 from typing import Callable, Dict
-from numpy.typing import NDArray, float64
-from numpy import (
-    array,
-    concatenate,
-    exp,
-    eye,
-    trace,
-    zeros,
-)
+from numpy.typing import NDArray
+from numpy import array, concatenate, exp, eye, trace, zeros, float64
 
 import numpy as np
 
@@ -17,7 +10,12 @@ from numpy.linalg import (
     inv,
 )
 
-from scipy.optimize import OptimizeResult, minimize
+from scipy.optimize import (
+    OptimizeResult,
+    minimize,
+    differential_evolution,
+    basinhopping,
+)
 
 from .utils import _is_positive_definite, _nearest_positive_definite
 from .qp import _quad_format, _solve_qp_cvxopt
@@ -32,8 +30,11 @@ def _gcv_wrapper(func: Callable) -> Callable:
         Z_re: NDArray[float64],
         Z_im: NDArray[float64],
         M: NDArray[float64],
+        show_lam: bool = False,
     ):
         lambda_value: float64 = exp(ln_lambda)
+        if show_lam:
+            print(f"Lambda value: {lambda_value}")
 
         # See eq. 5 in https://doi.org/10.1149/1945-7111/acbca4
         A: NDArray[float64] = concatenate((A_re, A_im), axis=0)
@@ -72,7 +73,8 @@ def _compute_generalized_cross_validation(
     Z_exp: NDArray[float64],
 ) -> float64:
     """
-    This function computes the score for the generalized cross-validation (GCV) approach.
+    This function computes the log of the score for the generalized cross-validation (GCV) approach.
+    Computing the log of the score is necessary for large M where the function becomes very flat.
 
     Reference: G. Wahba, A comparison of GCV and GML for choosing the smoothing parameter in the generalized spline smoothing problem, Ann. Statist. 13 (1985) 1378–1402.
     """
@@ -80,8 +82,7 @@ def _compute_generalized_cross_validation(
     num: float64 = (norm((I - K) @ Z_exp) ** 2) / (2 * M)
     den: float64 = (trace(I - K) / (2 * M)) ** 2
     score: float64 = num / den
-
-    return score
+    return np.log(score)
 
 
 @_gcv_wrapper
@@ -92,7 +93,8 @@ def _compute_modified_gcv(
     Z_exp: NDArray[float64],
 ) -> float64:
     """
-    This function computes the score for the modified generalized cross validation (mGCV) approach.
+    This function computes the log of the score for the modified generalized cross validation (mGCV) approach.
+    Computing the log of the score is necessary for large M where the function becomes very flat.
 
     Reference: Y.J. Kim, C. Gu, Smoothing spline Gaussian regression: More scalable computation via efficient approximation, J. Royal Statist. Soc. 66 (2004) 337–356.
     """
@@ -104,8 +106,7 @@ def _compute_modified_gcv(
     num: float64 = (norm((I - K) @ Z_exp) ** 2) / (2 * M)
     den: float64 = (trace(I - rho * K) / (2 * M)) ** 2
     score: float64 = num / den
-
-    return score
+    return np.log(score)
 
 
 @_gcv_wrapper
@@ -116,7 +117,8 @@ def _compute_robust_gcv(
     Z_exp: NDArray[float64],
 ) -> float64:
     """
-    This function computes the score for the robust generalized cross-validation (rGCV) approach.
+    This function computes the log of the score for the robust generalized cross-validation (rGCV) approach.
+    Computing the log of the score is necessary for large M where the function becomes very flat.
 
     Reference: M. A. Lukas, F. R. de Hoog, R. S. Anderssen, Practical use of robust GCV and modified GCV for spline smoothing, Comput. Statist. 31 (2016) 269–289.
     """
@@ -131,7 +133,7 @@ def _compute_robust_gcv(
     mu_2: float64 = trace(K.T @ K) / (2 * M)
     score: float = (xi + (1 - xi) * mu_2) * gcv_score
 
-    return score
+    return np.log(score)
 
 
 # # TODO: This seems to be giving different answers compared to pyDRTtools
@@ -200,6 +202,7 @@ def _compute_L_curve(
     Z_re: NDArray[float64],
     Z_im: NDArray[float64],
     M: NDArray[float64],
+    show_lam: bool = False,
 ) -> float64:
     """
     This function computes the score for L curve (LC)
@@ -208,6 +211,9 @@ def _compute_L_curve(
     """
 
     lambda_value = exp(ln_lambda)
+
+    if show_lam:
+        print(f"Lambda value: {lambda_value}")
 
     A = concatenate(
         (A_re, A_im), axis=0
@@ -228,7 +234,7 @@ def _compute_L_curve(
     # denominator eta_denom of the first derivative of eta
     A_agm_d = A @ A.T + lambda_value * eye(A.shape[0])
     if not _is_positive_definite(A_agm_d):
-        A_agm = _nearest_positive_definite(A_agm_d)
+        A_agm_d = _nearest_positive_definite(A_agm_d)
 
     L_agm_d = cholesky(A_agm_d)  # Cholesky transform to inverse A_agm_d
     inv_L_agm_d = inv(L_agm_d)
@@ -261,9 +267,9 @@ def _compute_L_curve(
     LC_denom = ((eta_prime) ** 2 + (theta_prime) ** 2) ** (3 / 2)
 
     # LC score ; see (19) in [4]
-    LC_score = LC_num / LC_denom
+    LC_score = np.abs(LC_num / LC_denom)
 
-    return -LC_score
+    return LC_score
 
 
 _LAMBDA_SELECTION_METHODS: Dict[str, Callable] = {
@@ -285,23 +291,60 @@ def _pick_lambda(
     M: NDArray[float64],
     lambda_value0: float,
     lambda_selection: str,
+    method: str = "basinhopping",
+    bounds: list = None,
+    options: dict = None,
 ) -> float:
 
     if lambda_selection == "fixed":
         lambda_value = lambda_value0
     else:
+        if bounds is None:
+            bounds = [(np.log(1e-9), np.log(1e0))]
+        if options is None:
+            options = {"disp": False}
 
-        result: OptimizeResult = minimize(
-            _LAMBDA_SELECTION_METHODS[lambda_selection],
-            np.log(lambda_value0),
-            args=(A_re, A_im, Z_re, Z_im, M),
-            method="SLSQP",
-            bounds=[(np.log(1e-7), np.log(1e0))],
-            options={
-                "disp": False,
-                "maxiter": 2000,
-            },
-        )
-        lambda_value = float(np.exp(result.x)[0])
+        show_lam = options["disp"]
+
+        # Choose optimization strategy based on method
+        if method == "differential_evolution":
+            result = differential_evolution(
+                _LAMBDA_SELECTION_METHODS[lambda_selection],
+                bounds=bounds,
+                args=(A_re, A_im, Z_re, Z_im, M, show_lam),
+                maxiter=options.get("maxiter", 100),
+                atol=options.get("atol", 0),
+                tol=options.get("tol", 0.01),
+                disp=options.get("disp", False),
+                seed=options.get("seed", 42),
+            )
+            lambda_value = float(np.exp(result.x[0]))
+
+        elif method == "basinhopping":
+            minimizer_kwargs = {
+                "method": options.get("local_method", "L-BFGS-B"),
+                "args": (A_re, A_im, Z_re, Z_im, M, show_lam),
+                "bounds": bounds,
+            }
+            result = basinhopping(
+                _LAMBDA_SELECTION_METHODS[lambda_selection],
+                np.log(lambda_value0),
+                minimizer_kwargs=minimizer_kwargs,
+                niter=options.get("niter", 50),
+                disp=options.get("disp", False),
+            )
+            lambda_value = float(np.exp(result.x[0]))
+
+        else:
+            # Standard local optimization (e.g., "L-BFGS-B", "SLSQP", "Powell")
+            result = minimize(
+                _LAMBDA_SELECTION_METHODS[lambda_selection],
+                np.log(lambda_value0),
+                args=(A_re, A_im, Z_re, Z_im, M, show_lam),
+                method=method,
+                bounds=bounds,
+                options=options,
+            )
+            lambda_value = float(np.exp(result.x)[0])
 
     return lambda_value

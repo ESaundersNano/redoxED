@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import copy
 
 
 class CyclingData:
@@ -334,3 +335,7 @@ class CyclingData:
         label_str = f", label='{self.label}'" if self.label else ""
 
         return f"CyclingData({n_cycles} cycles of {max_cycles}, time_series={has_timeseries}{label_str})"
+
+    def copy(self):
+        """Return a deep copy of this DRTData instance."""
+        return copy.deepcopy(self)

@@ -21,9 +21,7 @@ class EfficiencyPlot(BasePlot):
         super().__init__(usetex=usetex, **kwargs)
 
     def _configure_axes(self) -> None:
-        """Configure axes specifically for Nyquist plots."""
-        # Ensure equal aspect ratio for proper circle representation
-        self.ax.set_aspect("equal", adjustable="datalim")
+        """Configure axes specifically for efficiency plots."""
 
         self.ax.tick_params(
             axis="both",
@@ -33,8 +31,8 @@ class EfficiencyPlot(BasePlot):
         )
 
         # Set labels with proper LaTeX formatting - LaTeX preference already set globally
-        self.ax.set_xlabel(r"$Cycle \ No.$")
-        self.ax.set_ylabel(r"$Efficiency$ / $\%$")
+        self.ax.set_xlabel(r"Cycle No.")
+        self.ax.set_ylabel(r"Efficiency / \%")
 
         self.ax2 = None
 

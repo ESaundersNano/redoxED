@@ -96,7 +96,7 @@ def df_to_PolarisationData(
     label: str | None = None,
 ) -> PolarisationData:
     """
-    make sure to note units
+    Assumes df has current units of mA and that the cell area is given in cm2.
     At the moment assumes provide indices of which parts of pulse you want to keep, applying the same to all.
     have to make sure also have wisely selected which bits of pulse are keeping.
     Am for now trusting the control I values even though not what is actually recorded.
@@ -130,6 +130,57 @@ def df_to_PolarisationData(
 
         V.append(avg_Ewe)
         j.append(avg_control_j)
+    V = np.array(V)
+    j = np.array(j)
+
+    return PolarisationData(V, j, A, label=label)
+
+
+def df_to_PolarisationData2(
+    df: pd.DataFrame,
+    A: float = 5,  # cm2
+    pulse_index_range: tuple = (-5, None),
+    label: str | None = None,
+) -> PolarisationData:
+    """
+    Convert DataFrame to PolarisationData by grouping by control current values instead of half cycle.
+    Useful when half cycle column is not properly populated but control/V/mA changes correctly.
+
+    Args:
+        df: DataFrame containing polarisation data
+        A: Active area in cm2
+        pulse_index_range: Tuple specifying which part of each pulse to analyze (start, end indices)
+        label: Optional label for the PolarisationData object
+
+    Returns:
+        PolarisationData object
+    """
+    V = []
+    j = []
+    pulse_range = slice(pulse_index_range[0], pulse_index_range[1])
+
+    # Group by 'control/V/mA' values to identify different current steps
+    for control_current, group in df.groupby("control/V/mA"):
+
+        # Skip if the group is too small
+        if (
+            len(group) < abs(pulse_index_range[0])
+            if pulse_index_range[0] is not None
+            else 1
+        ):
+            continue
+
+        # Select the range of points you want to analyse
+        selected_group = group.iloc[pulse_range]
+
+        # Compute averages for 'Ewe/V' and 'control/V/mA'
+        avg_Ewe = selected_group["Ewe/V"].mean()
+        avg_control_I = selected_group["control/V/mA"].mean()
+        avg_control_j = avg_control_I / A
+
+        V.append(avg_Ewe)
+        j.append(avg_control_j)
+
     V = np.array(V)
     j = np.array(j)
 

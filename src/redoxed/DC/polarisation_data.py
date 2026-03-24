@@ -6,6 +6,8 @@ import numpy as np
 
 from sklearn.linear_model import LinearRegression
 
+import copy
+
 
 class PolarisationData:
     """ """
@@ -25,9 +27,9 @@ class PolarisationData:
         Initializes the PolarisationData object.
 
         Args:
-            V (np.ndarray): Potential data.
-            j (np.ndarray): Current density data.
-            A (float): Area of the electrode.
+            V (np.ndarray): Potential data in V.
+            j (np.ndarray): Current density data in mA/cm2.
+            A (float): Area of the electrode in cm2.
             label (str | None, optional): Optional label for the dataset. Defaults to None.
         """
         self.V = V
@@ -123,3 +125,7 @@ class PolarisationData:
         self.ASR_error = error
 
         return PolarisationData_fit
+
+    def copy(self):
+        """Return a deep copy of this DRTData instance."""
+        return copy.deepcopy(self)

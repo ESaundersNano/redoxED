@@ -103,6 +103,7 @@ def _generate_parameters(
     skew: bool,
     log_tau0_bound: float | None = None,
     assym_bound: float | None = None,
+    dispersion_bounds: tuple | None = None,
 ) -> Tuple[Parameters, int]:
     """
     Generate lmfit.Parameters for each peak, with bounds and initial guesses.
@@ -121,6 +122,8 @@ def _generate_parameters(
         Bound for asymmetry parameters. If None, uses default bounds.
         For HN: sets beta min to 1 - assym_bound.
         For SG: sets upsilon bounds to [-assym_bound, +assym_bound].
+    dispersion_bounds : tuple or None, optional
+        Bound for dispersion parameters. If None, uses default bounds.
 
     Returns
     -------
@@ -194,12 +197,20 @@ def _generate_parameters(
                 # no max set
             )
 
-            parameters.add(
-                name=f"alpha_{i}",
-                value=0.9,
-                min=0.0,
-                max=1.0,
-            )
+            if dispersion_bounds is not None:
+                parameters.add(
+                    name=f"alpha_{i}",
+                    value=0.9,
+                    min=dispersion_bounds[0],
+                    max=dispersion_bounds[1],
+                )
+            else:
+                parameters.add(
+                    name=f"alpha_{i}",
+                    value=0.9,
+                    min=0.0,
+                    max=1.0,
+                )
 
             if assym_bound is not None:
                 parameters.add(
@@ -245,12 +256,20 @@ def _generate_parameters(
                     vary=skew,  # allow to vary if skew is permitted
                 )
 
-            parameters.add(
-                name=f"sigma_{i}",
-                value=0.05,
-                min=1e-10,
-                max=1e2,
-            )
+            if dispersion_bounds is not None:
+                parameters.add(
+                    name=f"sigma_{i}",
+                    value=0.05,
+                    min=dispersion_bounds[0],
+                    max=dispersion_bounds[1],
+                )
+            else:
+                parameters.add(
+                    name=f"sigma_{i}",
+                    value=0.05,
+                    min=1e-10,
+                    max=1e2,
+                )
             num_variables += 4 if skew else 3
 
     return (parameters, num_variables)
@@ -319,7 +338,7 @@ def _residual(
 ) -> NDArray[float64]:
     """
     Residual function for minimization: difference between fit and data.
-    Uses absolute residuals to avoid divide-by-zero issues.
+    Uses absolute residuals rather than relative to avoid divide-by-zero issues.
     """
     return np.abs(_function(log_tau, parameters, peak_type) - gamma)
 
@@ -375,8 +394,22 @@ class DRTPeak:
 
         Parameters
         ----------
-        quad_opts : dict or None, optional
-            Options for scipy.integrate.quad (SG peaks only).
+        quad_opts : dict | None, optional
+        Dictionary of options to pass to scipy.integrate.quad for peak area calculation.
+        May need to reduce a and b limits if getting integration warnings. Likely you just start getting numeric instability when interval is too large.
+        With typical peak sizes, limits of -20 to 5 are more than reasonable (1e-8 to 1e2 tau).
+
+        If None, uses:
+            {'epsabs': 1e-9, 'epsrel': 1e-9, 'limit': 100, 'a': -20, 'b': 20}
+        Valid keys:
+            - 'epsabs': Absolute error tolerance (default: 1e-9)
+            - 'epsrel': Relative error tolerance (default: 1e-9)
+            - 'limit': Maximum number of subintervals (default: 100)
+            - 'a': Lower integration limit (default: -50)
+            - 'b': Upper integration limit (default: 50)
+        Example:
+            quad_opts = {'epsabs': 1e-8, 'epsrel': 1e-8, 'limit': 200, 'a': -20, 'b': 5}
+
 
         Returns
         -------
@@ -388,8 +421,8 @@ class DRTPeak:
         elif self.peak_params["peak_type"] == "SG":
             # Default quad options for integration
             default_opts = {
-                "a": -50,
-                "b": 50,
+                "a": -20,
+                "b": 20,
                 "epsabs": 1e-9,
                 "epsrel": 1e-9,
                 "limit": 100,
@@ -478,6 +511,7 @@ class DRTPeaks:
     def get_peak_Z(
         self,
         index: int,
+        quad_opts: dict | None = None,
     ) -> float64:
         """
         Get the area (Z) for a specific peak by index.
@@ -500,11 +534,12 @@ class DRTPeaks:
                 f"Index {index} is out of range for peaks (0 to {num_peaks-1})"
             )
         peak: DRTPeak = self.peaks[index]
-        return peak.get_Z()
+        return peak.get_Z(quad_opts=quad_opts)
 
     def to_peaks_df(
         self,
         peak_indices: List[int] | None = None,
+        quad_opts: dict | None = None,
     ) -> pd.DataFrame:
         """
         Return a DataFrame with each row representing a peak.
@@ -532,7 +567,7 @@ class DRTPeaks:
             row.update(peak.peak_params)
             if "log_tau0" in row:
                 row["tau0"] = np.exp(row["log_tau0"])
-            row["Z"] = peak.get_Z()
+            row["Z"] = peak.get_Z(quad_opts=quad_opts)
             rows.append(row)
         return pd.DataFrame(rows)
 
@@ -545,6 +580,7 @@ def fit_DRT_peaks(
     skew: bool = True,
     log_tau0_bound: float | None = 0.1,
     assym_bound: float | None = None,
+    dispersion_bounds: tuple | None = None,
     minimizer_settings: dict = None,
 ) -> DRTPeaks:
     """
@@ -569,8 +605,15 @@ def fit_DRT_peaks(
         For HN: sets beta min to 1 - assym_bound.
         For SG: sets upsilon bounds to [-assym_bound, +assym_bound].
         Must be <= 1.
+    dispersion_bounds : tuple or None, optional
+        Bound for dispersion parameters. If None, uses default bounds.
+
     minimizer_settings : dict or None, optional
-        Dictionary with minimizer method and fit_kws. E.g. {"method": "leastsq", "fit_kws": {...}}
+        Dictionary with minimizer method and fit_kws. E.g. {"method": "leastsq", "fit_kws": {...}} methods include 'leastsq', 'nelder', 'lbfgsb', 'differential_evolution', etc.
+        L2 norm minimisation gives preference to peak height, L1 norm to peak area (for uniform tau).
+        Notably, whilst leastsq etc uses L2 norm, nelder-mead and powell use L1 norm.
+        Nelder-mead sticks closer to initial conditions, which I have found gives more sensible results.
+        Other fit kwords include ftol and xtol.
 
     Returns
     -------
@@ -628,6 +671,7 @@ def fit_DRT_peaks(
         skew=skew,
         log_tau0_bound=log_tau0_bound,
         assym_bound=assym_bound,
+        dispersion_bounds=dispersion_bounds,
     )
 
     # safeguard that peak fit isn't overfitting (most likely in the case that neither num_peaks nor peak_positions is provided)
@@ -644,7 +688,7 @@ def fit_DRT_peaks(
         )
 
     # Set minimizer defaults
-    method: str = "leastsq"
+    method: str = "nelder"
     fit_kws: dict = {}
 
     if minimizer_settings is not None:

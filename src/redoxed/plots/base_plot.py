@@ -15,6 +15,7 @@ from matplotlib.ticker import MultipleLocator, AutoMinorLocator, LogLocator
 from pathlib import Path
 import warnings
 from typing import Tuple, Any
+import copy
 from .. import config
 
 
@@ -196,3 +197,7 @@ class BasePlot(ABC):
             **kwargs: Additional arguments passed to plt.savefig().
         """
         self.fig.savefig(filename, **kwargs)
+
+    def copy(self):
+        """Return a deep copy of this plot instance."""
+        return copy.deepcopy(self)

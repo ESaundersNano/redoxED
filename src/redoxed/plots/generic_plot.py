@@ -87,7 +87,8 @@ class GenericPlot(BasePlot):
         self.ax.plot(
             df[self.x_col],
             df[self.y_col],
-            label=f"{label} ({self.y_col})",
+            # label=f"{label} ({self.y_col})",
+            label=label,
             **plot_kwargs,
         )
 
@@ -99,14 +100,16 @@ class GenericPlot(BasePlot):
             self.ax2.plot(
                 df[self.x_col],
                 df[self.y2_col],
-                label=f"{label} ({self.y2_col})",
+                # label=f"{label} ({self.y2_col})",
+                label=label,
                 **plot_kwargs_2,
             )
             # plot dummy data for legend entry
             self.ax.plot(
                 np.nan,
                 np.nan,
-                label=f"{label} ({self.y2_col})",
+                # label=f"{label} ({self.y2_col})",
+                label=label,
                 **plot_kwargs_2,
             )
 

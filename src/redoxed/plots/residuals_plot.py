@@ -16,7 +16,7 @@ from redoxed.impedance import ResidualsData
 
 class ResidualsPlot(BasePlot):
     """
-    Residuals plot for analyzing fit quality in electrochemical data.
+    Residuals plot for analyzing Z fit quality in electrochemical data.
 
     Creates a plot of residuals vs. frequency with logarithmic x-axis
     for evaluating the quality of impedance data fitting.

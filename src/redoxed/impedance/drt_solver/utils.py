@@ -6,16 +6,10 @@ from numpy.linalg import (
     norm,
 )
 
-from numpy import (
-    diag,
-    dot,
-    eye,
-    spacing,
-    min as array_min,
-)
+from numpy import diag, dot, eye, spacing, min as array_min, float64
 
 from typing import List, Dict, Any
-from numpy.typing import NDArray, float64
+from numpy.typing import NDArray
 
 from multiprocessing import cpu_count
 from os import environ

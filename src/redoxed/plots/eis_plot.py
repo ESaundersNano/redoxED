@@ -92,10 +92,17 @@ class BodePlot(BasePlot):
         self.ax.set_ylabel(r"$|Z|$ / $\Omega$")
         # Create secondary y-axis for phase
         self.ax_phase = self.ax.twinx()
-        self.ax_phase.set_ylabel(r"Phase / Degrees")
+        self.ax_phase.set_ylabel(r"$\operatorname{{arg}}\!\left(Z\right)$ / Degrees")
 
     def add_plot(
-        self, eis_data: EISData, label: str | None = None, **kwargs: Any
+        self,
+        eis_data: EISData,
+        label: str | None = None,
+        marker_mag: str = "s",
+        linestyle_mag: str = "",
+        marker_phase: str = "^",
+        linestyle_phase: str = "",
+        **kwargs: Any,
     ) -> None:
         """
         Add EIS data to the Bode plot.
@@ -103,6 +110,10 @@ class BodePlot(BasePlot):
         Args:
             eis_data (EISData): The EIS data object to plot.
             label (str | None): Label for the plot. If None, uses the data's label.
+            marker_mag (str): Marker for the magnitude plot.
+            marker_phase (str): Marker for the phase plot.
+            linestyle_mag (str): Line style for the magnitude plot.
+            linestyle_phase (str): Line style for the phase plot.
             **kwargs: Additional arguments passed to matplotlib plot function.
         """
         if label is None:
@@ -111,24 +122,27 @@ class BodePlot(BasePlot):
         self.ax.plot(
             eis_data.f,
             eis_data.Z_mag,
-            label=f"{label} Magnitude",
-            marker="s",
+            label=rf"{label} $|Z|$",
+            marker=marker_mag,
+            linestyle=linestyle_mag,
             **kwargs,
         )
         # Phase plot in degrees (triangles)
         self.ax_phase.plot(
             eis_data.f,
             eis_data.Z_phase_deg,
-            label=f"{label} Phase",
-            marker="^",
+            label=rf"{label} $\operatorname{{arg}}\!\left(Z\right)$",
+            marker=marker_phase,
+            linestyle=linestyle_phase,
             **kwargs,
         )
         # make phase appear in legend
         self.ax.plot(
             np.nan,
             np.nan,
-            label=f"{label} Phase",
-            marker="^",
+            label=rf"{label} $\operatorname{{arg}}\!\left(Z\right)$",
+            marker=marker_phase,
+            linestyle=linestyle_phase,
             **kwargs,
         )
 

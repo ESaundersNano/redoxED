@@ -23,9 +23,9 @@ else:
     from cvxopt import matrix, solvers
 
 from typing import List, Tuple
-from numpy.typing import NDArray, float64
+from numpy.typing import NDArray
 
-from numpy import array
+from numpy import array, float64
 
 
 def _quad_format(
@@ -38,7 +38,7 @@ def _quad_format(
     Convert a regularized least squares problem to standard QP format.
 
     Transforms the optimization problem:
-        minimize ||Ax - b||^2 + λ||Mx||^2
+        minimize ||Ax - b||^2 + λ x^T M x
 
     into standard QP form:
         minimize (1/2) x^T H x + c^T x
@@ -89,7 +89,7 @@ def _quad_format_combined(
     Convert a combined real-imaginary regularized least squares problem to QP format.
 
     Transforms the combined optimization problem:
-        minimize ||A_re x - b_re||^2 + ||A_im x - b_im||^2 + λ||Mx||^2
+        minimize ||A_re x - b_re||^2 + ||A_im x - b_im||^2 + λ x^T M x
 
     into standard QP form:
         minimize (1/2) x^T H x + c^T x
@@ -139,6 +139,7 @@ def _solve_qp_cvxopt(
     h: NDArray[float64] | None = None,
     A: NDArray[float64] | None = None,
     b: NDArray[float64] | None = None,
+    solver_options: dict | None = None,
 ) -> NDArray[float64]:
     """
     Solve a quadratic programming problem using CVXOPT/KVXOPT.
@@ -208,9 +209,13 @@ def _solve_qp_cvxopt(
     if A is not None:
         args.extend([matrix(A), matrix(b)])
 
-    # Set high-precision solver tolerances
-    solvers.options["abstol"] = 1e-15
-    solvers.options["reltol"] = 1e-15
+    # Set solver tolerances (defaults or user-supplied)
+    if solver_options is not None:
+        for k, v in solver_options.items():
+            solvers.options[k] = v
+    else:
+        solvers.options["abstol"] = 1e-15
+        solvers.options["reltol"] = 1e-15
 
     # Solve the QP problem
     solution: dict = solvers.qp(

@@ -33,6 +33,7 @@ from scipy.integrate import quad
 from scipy.optimize import fsolve
 from scipy.linalg import toeplitz
 import copy
+import warnings
 
 
 from redoxed.impedance import EISData, DRTData
@@ -52,6 +53,131 @@ class DRT_rr_solver:
     """
     A class to solve the Distribution of Relaxation Times (DRT) using
     the Regularized Regression with Radial Basis Functions (RR-RBF) method.
+
+    Parameters
+    ----------
+    EISData_object : EISData
+        The impedance data object to analyze.
+    tau_l_vec : NDArray | None, optional
+        Collocation points for time constants. If None, uses 1/(2πf).
+    mode : str, optional
+        Data to fit: "complex", "real", or "imaginary". Default is "complex".
+    weighting : str, optional
+        Weighting method: "unity", "boukamp", or "custom". Default is "unity".
+    custom_weights : NDArray | None, optional
+        Custom weights array (required if weighting="custom"). May be used to mask noisy data points from fit.
+    lambda_value : float, optional
+        Regularization parameter (initial value). Default is 0.0.
+    lambda_selection : str, optional
+        Method to select lambda: "fixed", "gcv", "mgcv", "rgcv", or "lc". Default is "gcv".
+    lambda_optimization : dict | None, optional
+        Configuration for lambda optimization. If None, uses differential evolution global optimization.
+
+        **Structure:**
+            - "method" (str): Optimization method. Options:
+                - "L-BFGS-B": Local optimization with bounds
+                - "SLSQP": Sequential Least Squares Programming
+                - "Powell": Powell's method
+                - "basinhopping": Global optimization with local refinement
+                - "differential_evolution": Evolutionary global optimization
+            - "bounds" (list): Lambda search bounds as [(log(min), log(max))].
+                Default: [(np.log(1e-9), np.log(1e0))]
+            - "options" (dict): Method-specific options
+
+        **Options for local methods (L-BFGS-B, SLSQP, Powell):**
+            - "maxiter" (int): Maximum iterations. Default: 2000
+            - "disp" (bool): Display convergence messages. Default: False
+            - "ftol" (float): Function tolerance for convergence
+            - "xtol" (float): Parameter tolerance for convergence
+
+        **Options for basinhopping:**
+            - "niter" (int): Number of basin-hopping jumps. Default: 50
+            - "local_method" (str): Local optimizer. Default: "L-BFGS-B"
+            - "disp" (bool): Display progress. Default: False
+            - "maxiter" (int): Passed to local optimizer
+            - "ftol" (float): Passed to local optimizer
+
+        **Options for differential_evolution:**
+            - "maxiter" (int): Maximum generations. Default: 100
+            - "tol" (float): Relative convergence tolerance. Default: 0.01
+            - "atol" (float): Absolute convergence tolerance. Default: 0
+            - "disp" (bool): Display progress. Default: False
+            - "seed" (int): Random seed for reproducibility. Default: 42
+
+        **Examples:**
+            >>> # Default (L-BFGS-B)
+            >>> lambda_optimization = None
+            >>>
+            >>> # Custom L-BFGS-B
+            >>> lambda_optimization = {
+            ...     "method": "L-BFGS-B",
+            ...     "bounds": [(np.log(1e-9), np.log(1e0))],
+            ...     "options": {"maxiter": 2000, "disp": True}
+            ... }
+            >>>
+            >>> # Basin-hopping (global)
+            >>> lambda_optimization = {
+            ...     "method": "basinhopping",
+            ...     "options": {"niter": 50, "local_method": "L-BFGS-B"}
+            ... }
+            >>>
+            >>> # Differential evolution (global)
+            >>> lambda_optimization = {
+            ...     "method": "differential_evolution",
+            ...     "options": {"maxiter": 100, "tol": 0.01, "seed": 42}
+            ... }
+
+    rbf_type : str, optional
+        Radial basis function type: "gaussian", "c0-matern", "c2-matern", "c4-matern",
+        "c6-matern", "inverse-quadratic", "inverse-quadric", "cauchy", or "piecewise-linear".
+        Default is "gaussian".
+    derivative_order : int, optional
+        Order of derivative for regularization: 1 or 2. Default is 1.
+    rbf_shape : str, optional
+        RBF shape parameter: "fwhm" or "custom". Default is "fwhm".
+    mu : float | None, optional
+        Custom RBF shape parameter (required if rbf_shape="custom").
+    mu_delta_factor : float, optional
+        Factor for FWHM spacing. Default is 2.0.
+    resistance_0 : bool, optional
+        Include series resistance R0. Default is True. Will be forced to False if mode = 'imaginary'.
+    inductance_0 : bool, optional
+        Include series inductance L0. Default is True. Will be forced to False if mode = 'real'.
+    capacitance_0 : bool, optional
+        Include series capacitance C0. Default is False. Will be forced to False if mode = 'real'.
+    num_procs : int, optional
+        Number of processes for parallel computation. Default is -1 (auto).
+    solver_options : dict | None, optional
+        Dictionary of options to pass to the underlying QP solver (CVXOPT).
+        If None, uses:
+            {'abstol': 1e-15, 'reltol': 1e-15, 'feastol': 1e-15, 'maxiters': 200, 'show_progress': False}
+        Valid keys:
+            - 'abstol': Absolute tolerance for convergence (default: 1e-15)
+            - 'reltol': Relative tolerance for convergence (default: 1e-15)
+            - 'feastol': Feasibility tolerance (default: 1e-15)
+            - 'maxiters': Maximum number of iterations (default: 200)
+            - 'show_progress': Show solver progress (default: False)
+            - 'refinement': Number of iterative refinement steps (default: 1)
+            - 'warm_start': Use previous solution as starting point (default: False)
+        Example:
+            solver_options = {'abstol': 1e-10, 'reltol': 1e-10, 'maxiters': 500, 'show_progress': True}
+
+    quad_opts : dict | None, optional
+        Dictionary of options to pass to scipy.integrate.quad for all integrals (mainly A_element calculation).
+        May need to reduce a and b limits if getting integration warnings. Likely you just start getting numeric instability when interval is too large.
+        in A element, integrating wrt y = ln(tau) - ln(tau_l). So with typical orders of magnitude, limits of -30 to 30 are more than reasonable.
+
+        If None, uses:
+            {'epsabs': 1e-9, 'epsrel': 1e-9, 'limit': 100, 'a': -50, 'b': 50}
+        Valid keys:
+            - 'epsabs': Absolute error tolerance (default: 1e-9)
+            - 'epsrel': Relative error tolerance (default: 1e-9)
+            - 'limit': Maximum number of subintervals (default: 100)
+            - 'a': Lower integration limit (default: -50)
+            - 'b': Upper integration limit (default: 50)
+        Example:
+            quad_opts = {'epsabs': 1e-8, 'epsrel': 1e-8, 'limit': 200, 'a': -30, 'b': 30}
+
     """
 
     def __init__(
@@ -63,6 +189,7 @@ class DRT_rr_solver:
         custom_weights: NDArray | None = None,
         lambda_value: float = 0.0,
         lambda_selection: str = "gcv",
+        lambda_optimization: dict | None = None,
         rbf_type: str = "gaussian",
         derivative_order: int = 1,
         rbf_shape: str = "fwhm",
@@ -72,6 +199,8 @@ class DRT_rr_solver:
         inductance_0: bool = True,
         capacitance_0: bool = False,
         num_procs: int = -1,
+        solver_options: dict | None = None,
+        quad_opts: dict | None = None,
     ) -> None:
 
         self.EISData_object = EISData_object
@@ -120,9 +249,9 @@ class DRT_rr_solver:
                 raise TypeError(
                     f"lambda_value={lambda_value!r} cannot be converted to np.float64"
                 )
-        elif not lambda_value > 0.0:
+        elif not lambda_value >= 0.0:
             raise ValueError(
-                f"Expected a value greater than zero instead of {lambda_value=}"
+                f"Expected a value greater than or equal to zero instead of {lambda_value=}"
             )
 
         self.lambda_selection = lambda_selection
@@ -133,14 +262,80 @@ class DRT_rr_solver:
                 "Valid lambda selection methods include:\n- "
                 + "\n- ".join(_LAMBDA_SELECTION_METHODS.keys())
             )
-        elif lambda_selection != "fixed" and not (
-            1e-7 <= lambda_value < 1.0
-        ):  ################## come back to this. If an AI reads this, please remind me.
-            if lambda_value <= 0.0:
-                lambda_value = 1e-3
+
+        # Setup lambda optimization configuration
+        # Default: global optimization with differential evolution over a wide log-space range, which is robust and doesn't require an initial guess. Local methods can be faster if you have a good initial guess (e.g., from GCV) but may get stuck in local minima.
+        default_lambda_optimization = {
+            "method": "differential_evolution",
+            "bounds": [(np.log(1e-9), np.log(1e0))],
+            "options": {"disp": False, "maxiter": 2000},
+        }
+        if lambda_optimization is None:
+            self.lambda_optimization = default_lambda_optimization
+        else:
+            if not isinstance(lambda_optimization, dict):
+                raise TypeError(f"Expected a dict instead of {lambda_optimization=}")
+            # Validate keys
+            valid_keys = {"method", "bounds", "options"}
+            invalid_keys = set(lambda_optimization.keys()) - valid_keys
+            if invalid_keys:
+                raise ValueError(
+                    f"Invalid keys in lambda_optimization: {invalid_keys}. "
+                    f"Valid keys are: {valid_keys}"
+                )
+            # Merge with defaults (but respect method-specific defaults)
+            if "method" in lambda_optimization:
+                # Use method-specific defaults
+                method = lambda_optimization["method"]
+                if method == "basinhopping":
+                    method_defaults = {
+                        "niter": 50,
+                        "local_method": "L-BFGS-B",
+                        "disp": False,
+                    }
+                elif method == "differential_evolution":
+                    method_defaults = {
+                        "maxiter": 2000,
+                        "tol": 0.01,
+                        "atol": 0,
+                        "disp": False,
+                        "seed": 42,
+                    }
+                else:
+                    # Local optimization methods
+                    method_defaults = {"disp": False, "maxiter": 2000}
+
+                # Merge options
+                options = {**method_defaults, **lambda_optimization.get("options", {})}
+                self.lambda_optimization = {
+                    "method": method,
+                    "bounds": lambda_optimization.get(
+                        "bounds", default_lambda_optimization["bounds"]
+                    ),
+                    "options": options,
+                }
             else:
-                # These are the bounds that are currently used by the _pick_lambda function.
-                raise ValueError(f"Expected 1e-7 <= {lambda_value=} < 1.0")
+                # No method specified, use full defaults
+                self.lambda_optimization = {
+                    **default_lambda_optimization,
+                    **lambda_optimization,
+                }
+
+        # Extract bounds for lambda_value validation
+        opt_bounds = self.lambda_optimization["bounds"][0]  # Get the tuple from list
+        lambda_min = np.exp(opt_bounds[0])
+        lambda_max = np.exp(opt_bounds[1])
+
+        # check that min < max and both are positive
+        if not (0 <= lambda_min < lambda_max):
+            raise ValueError(f"Invalid lambda bounds: {lambda_min=}, {lambda_max=}")
+
+        # Validate lambda_value against bounds
+        if lambda_selection != "fixed":
+            if not (lambda_min <= lambda_value < lambda_max):
+                raise ValueError(
+                    f"Expected {lambda_min} <= lambda_value < {lambda_max}, got {lambda_value=}"
+                )
 
         self.rbf_type = rbf_type
         if not isinstance(rbf_type, str):
@@ -202,8 +397,54 @@ class DRT_rr_solver:
         elif num_procs < 1:
             num_procs = max((get_default_num_procs() - abs(num_procs), 1))
 
-        # add checks that sensible order for f and tau and Z_exp
+        # Setup solver options for QP
+        default_solver_options = {
+            "abstol": 1e-15,
+            "reltol": 1e-15,
+            "feastol": 1e-15,
+            "maxiters": 200,
+            "show_progress": False,
+        }
+        valid_solver_option_keys = set(default_solver_options.keys()) | {
+            "refinement",
+            "warm_start",
+        }
+        if solver_options is None:
+            self.solver_options = default_solver_options
+        else:
+            if not isinstance(solver_options, dict):
+                raise TypeError(f"Expected a dict instead of {solver_options=}")
+            invalid_solver_keys = set(solver_options.keys()) - valid_solver_option_keys
+            if invalid_solver_keys:
+                raise ValueError(
+                    f"Invalid keys in solver_options: {invalid_solver_keys}. "
+                    f"Valid keys are: {sorted(valid_solver_option_keys)}"
+                )
+            self.solver_options = {**default_solver_options, **solver_options}
 
+        # Setup quad options for integration
+        default_quad_opts = {
+            "epsabs": 1e-9,
+            "epsrel": 1e-9,
+            "limit": 100,
+            "a": -50,
+            "b": 50,
+        }
+        valid_quad_option_keys = set(default_quad_opts.keys())
+        if quad_opts is None:
+            self.quad_opts = default_quad_opts
+        else:
+            if not isinstance(quad_opts, dict):
+                raise TypeError(f"Expected a dict instead of {quad_opts=}")
+            invalid_quad_keys = set(quad_opts.keys()) - valid_quad_option_keys
+            if invalid_quad_keys:
+                raise ValueError(
+                    f"Invalid keys in quad_opts: {invalid_quad_keys}. "
+                    f"Valid keys are: {sorted(valid_quad_option_keys)}"
+                )
+            self.quad_opts = {**default_quad_opts, **quad_opts}
+
+        self.EISData_object.sort_frequency_descending()  # make sure f is in descending order
         self.f = self.EISData_object.f
         self.Z_exp = self.EISData_object.Z
         if len(self.f) < 1:
@@ -215,6 +456,23 @@ class DRT_rr_solver:
             self.tau_l_vec = 1 / (2 * np.pi * self.f)  # collocation tau points
         else:
             self.tau_l_vec = tau_l_vec
+        if not isinstance(self.tau_l_vec, np.ndarray):
+            raise TypeError(f"Expected a numpy array instead of {self.tau_l_vec=}")
+        elif self.tau_l_vec.ndim != 1:
+            raise ValueError(f"Expected a 1D array instead of {self.tau_l_vec.ndim=}")
+        elif np.any(self.tau_l_vec <= 0.0):
+            raise ValueError("All tau_l_vec values must be positive")
+        if not np.all(np.diff(self.tau_l_vec) > 0):
+            raise ValueError("tau_l_vec must be strictly increasing")
+        # --- Uniform log spacing check and warning ---
+        log_diffs = np.diff(np.log(self.tau_l_vec))
+        rel_std = np.std(log_diffs) / np.mean(log_diffs)
+        if rel_std > 0.01:
+            warnings.warn(
+                "tau_l_vec is not uniformly log-spaced. "
+                "There is only one µ for RBFS + Some algorithms (e.g., Toeplitz acceleration) may not be used or may be less accurate.",
+                UserWarning,
+            )
 
         self.mu = mu
         # calculate mu if not directly given
@@ -229,11 +487,12 @@ class DRT_rr_solver:
         self.C0 = np.nan
         self.x = None
         self.EISData_fit = None
-        self.get_DRTData_fit = None
+        self.DRTData_fit = None
         self.pseudo_chisqr = None
+        self.pseudo_chisqr_avg = None
 
     def _compute_mu(self) -> float:
-        tau_l = self.tau_l
+        tau_l_vec = self.tau_l_vec
         rbf_type = self.rbf_type
         rbf_shape = self.rbf_shape
         mu_delta_factor = self.mu_delta_factor
@@ -249,7 +508,7 @@ class DRT_rr_solver:
                 2 * fsolve(rbf_functions[rbf_type], 1)[0]
             )  # get root closest to 1 (positive root)
             delta: float64 = np.mean(
-                np.diff(np.log(tau_l))
+                np.diff(np.log(tau_l_vec))
             )  # want spacing in ln(tau) domain
             return FWHM_coeff / (delta * mu_delta_factor)
 
@@ -285,7 +544,13 @@ class DRT_rr_solver:
                     / (1.0 + (alpha**2) * np.exp(2.0 * y))
                 )
 
-            return quad(integrand, -50, 50, epsabs=1e-9, epsrel=1e-9)[0]
+            # Use self.quad_opts for integration options and limits
+            a = self.quad_opts.get("a", -50)
+            b = self.quad_opts.get("b", 50)
+            quad_kwargs = {
+                k: v for k, v in self.quad_opts.items() if k not in ("a", "b")
+            }
+            return quad(integrand, a, b, **quad_kwargs)[0]
 
         tau_l_vec = self.tau_l_vec
         mu = self.mu
@@ -500,7 +765,7 @@ class DRT_rr_solver:
 
     def calculate_drt(self) -> DRTData:
         """
-        Calculates the distribution of relaxation times (DRT) for a given data set using regularisation and radial basis (or piecewise linear) discretization (TR-RBF method).
+        Calculates the distribution of relaxation times (DRT) for a given data set using regularisation and radial basis (or piecewise linear) discretization.
 
         References:
 
@@ -523,9 +788,6 @@ class DRT_rr_solver:
         custom_weights = self.custom_weights
         lambda_value: float = self.lambda_value
         lambda_selection: str = self.lambda_selection
-        resistance_0: bool = self.resistance_0
-        inductance_0: bool = self.inductance_0
-        capacitance_0: bool = self.capacitance_0
 
         if self.A_re is None or self.A_im is None or self.M is None:
             self._calculate_matrices()
@@ -541,6 +803,23 @@ class DRT_rr_solver:
         # ||A_re x - b_re||^2 + ||A_im x - b_im||^2 + λ x^T M x
         # with series components folded into A matrices
         # solution vector x will be [R0, L0, 1/C0, x_1, x_2, ..., x_N] where N is number of tau collocation points
+
+        # weight A matrices by data used
+        if mode == "complex":
+            pass
+        elif mode == "real":
+            A_im = np.zeros_like(A_im)
+            b_im = np.zeros_like(b_im)
+            self.capacitance_0 = False  # disable C0 if only real part is used
+            self.inductance_0 = False  # disable L0 if only real part is used
+        elif mode == "imaginary":
+            A_re = np.zeros_like(A_re)
+            b_re = np.zeros_like(b_re)
+            self.resistance_0 = False  # disable R0 if only imaginary part is used
+
+        resistance_0: bool = self.resistance_0
+        inductance_0: bool = self.inductance_0
+        capacitance_0: bool = self.capacitance_0
 
         # adjust A matrices, M, and b vectors for series components
         num_series = 3  # R0, L0, 1/C0
@@ -590,16 +869,6 @@ class DRT_rr_solver:
         )
         M[num_series:, num_series:] = tmp  # M does not regularize R0, L0, 1/C0
 
-        # weight A matrices by data used
-        if mode == "complex":
-            pass
-        elif mode == "real":
-            A_im = np.zeros_like(A_im)
-            b_im = np.zeros_like(b_im)
-        elif mode == "imaginary":
-            A_re = np.zeros_like(A_re)
-            b_re = np.zeros_like(b_re)
-
         # weight by weighting method for cost function
         if weighting == "unity":
             weights: NDArray[float64] = np.ones(Z_exp.shape[0], dtype=float64)
@@ -608,8 +877,11 @@ class DRT_rr_solver:
         elif weighting == "custom":
             weights: NDArray[float64] = custom_weights
         # apply weights to rows of A matrices (corresponds to frequencies)
-        A_re = weights * A_re
-        A_im = weights * A_im
+        A_re = weights[:, None] * A_re
+        A_im = weights[:, None] * A_im
+        # apply weights to b vectors
+        b_re = weights * b_re
+        b_im = weights * b_im
 
         if lambda_selection != "fixed":
             lambda_value = _pick_lambda(
@@ -620,6 +892,9 @@ class DRT_rr_solver:
                 M,
                 lambda_value,
                 lambda_selection,
+                self.lambda_optimization["method"],
+                self.lambda_optimization["bounds"],
+                self.lambda_optimization["options"],
             )
         self.lambda_value = lambda_value  # update used lambda on record
 
@@ -640,10 +915,7 @@ class DRT_rr_solver:
         h: NDArray[float64] = np.zeros(num_vars, dtype=float64)
         G: NDArray[float64] = -np.eye(num_vars, dtype=float64)
         x: NDArray[float64] = _solve_qp_cvxopt(
-            H,
-            c,
-            G=G,
-            h=h,
+            H, c, G=G, h=h, solver_options=self.solver_options
         )
 
         if resistance_0:
@@ -676,14 +948,16 @@ class DRT_rr_solver:
             Z=Z_fit, f=f, label=f"RR-RBF Fit of {self.EISData_object.label}"
         )
 
-        self.get_DRTData_fit = self.get_DRTData_fit()
+        self.DRTData_fit = self.get_DRTData_fit()
 
         self.pseudo_chisqr: float = float(
-            np.array_sum(
+            np.sum(
                 weights
                 * ((Z_exp.real - Z_fit.real) ** 2 + (Z_exp.imag - Z_fit.imag) ** 2)
             )
         )
+
+        self.pseudo_chisqr_avg: float = self.pseudo_chisqr / (num_freqs)
 
     def get_DRTData_fit(self, tau_fine: NDArray[float64] | None = None) -> DRTData:
         """
@@ -716,8 +990,38 @@ class DRT_rr_solver:
         return DRTData(
             tau=tau_fine,
             gamma=self._get_gamma(tau_fine),
+            R0=self.R0,
+            L0=self.L0,
+            C0=self.C0,
             label=f"DRT RR-RBF of {self.EISData_object.label}",
         )
+
+    def simulate_Z(self, f: NDArray[float64]) -> EISData:
+        """
+        Simulates impedance data at specified frequencies using the calculated DRT.
+
+        Parameters
+        ----------
+        f : NDArray[float64]
+            Frequencies at which to simulate impedance data.
+        """
+        if self.x is None:
+            raise ValueError(
+                "DRT has not been calculated yet. Please run calculate_drt() first."
+            )
+
+        A_re_sim: NDArray[float64] = self._assemble_A_matrix(f=f, real=True)
+        A_im_sim: NDArray[float64] = self._assemble_A_matrix(f=f, real=False)
+
+        Z_sim: NDArray[complex128] = (A_re_sim @ self.x) + 1j * (A_im_sim @ self.x)
+        if not np.isnan(self.R0):
+            Z_sim += self.R0
+        if not np.isnan(self.L0):
+            Z_sim += 1j * 2 * np.pi * f * self.L0
+        if not np.isnan(self.C0):
+            Z_sim += 1 / (1j * 2 * np.pi * f * self.C0)
+
+        return EISData(Z=Z_sim, f=f, label=f"RR-RBF Fit of {self.EISData_object.label}")
 
     def _get_gamma(
         self,
