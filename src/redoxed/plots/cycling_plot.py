@@ -32,7 +32,10 @@ class EfficiencyPlot(BasePlot):
 
         # Set labels with proper LaTeX formatting - LaTeX preference already set globally
         self.ax.set_xlabel(r"Cycle No.")
-        self.ax.set_ylabel(r"Efficiency / \%")
+        # self.ax.set_ylabel(r"Efficiency / \%")
+        self.ax.set_ylabel(
+            r"Efficiency / \%" if self.usetex else "Efficiency / %"
+        )  # render % symbol properly depending on usetex
 
         self.ax2 = None
 

@@ -94,6 +94,51 @@ class DRTData:
         pol_resistance = np.trapezoid(gamma, ln_tau)
         return pol_resistance
 
+    def get_DRT_integral(self, tau_min: float, tau_max: float) -> float64:
+        """
+        Calculate the polarization resistance integral between two specified tau values.
+
+        This method computes the integral of gamma with respect to log(tau) over a specified
+        range. If tau values fall partially outside the range, only the available values
+        within [tau_min, tau_max] are used.
+
+        Parameters
+        ----------
+        tau_min : float
+            Minimum relaxation time (linear scale).
+        tau_max : float
+            Maximum relaxation time (linear scale).
+
+        Returns
+        -------
+        float64
+            Area under the spectrum between tau_min and tau_max (partial Zp value).
+            Returns np.nan if no tau values fall within the specified range.
+        """
+        tau = self.tau.copy()
+        gamma = self.gamma.copy()
+
+        # Ensure tau is in ascending order
+        if not np.all(np.diff(tau) > 0):
+            sort_idx = np.argsort(tau)
+            tau = tau[sort_idx]
+            gamma = gamma[sort_idx]
+
+        # Filter to specified tau range
+        mask = (tau >= tau_min) & (tau <= tau_max)
+        tau_filtered = tau[mask]
+        gamma_filtered = gamma[mask]
+
+        # Handle case where no tau values fall within range
+        if len(tau_filtered) == 0:
+            return np.nan
+
+        # Calculate integral in log-tau space
+        ln_tau = np.log(tau_filtered)
+        resistance_integral = np.trapezoid(gamma_filtered, ln_tau)
+
+        return resistance_integral
+
     def copy(self):
         """Return a deep copy of this DRTData instance."""
         return copy.deepcopy(self)

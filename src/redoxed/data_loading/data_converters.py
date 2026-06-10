@@ -83,6 +83,7 @@ def df_to_CyclingData(
     # control/V/mA is sometimes out of sync with data, but rest of quantities are correct according to what dq/mA.h is doing. Notably, seems to change to next control in the last few indices before an Ns change
     # Q charge/discharge/mA.h is cumulative in a half cycle
     # (Q-Qo)/mA.h is the cumulative charge over the whole operation so tracks how much has been lost over cycling
+    # instead of these, code relies upon raw dq for calculations of current and charge.
 
     return CyclingData.from_V_t_dq_cycle(
         V_cell=V_cell, time=time, dq=dq, cycle_number=cycle_number, label=label

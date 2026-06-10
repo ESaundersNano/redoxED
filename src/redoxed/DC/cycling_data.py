@@ -4,7 +4,51 @@ import copy
 
 
 class CyclingData:
-    """ """
+    """
+    Container for electrochemical cycling data with per-cycle summaries and full time-series data.
+
+    All quantities are in SI units unless otherwise noted:
+    - Voltage: V (Volts)
+    - Charge: C (Coulombs)
+    - Energy: J (Joules)
+    - Time: s (seconds)
+    - Current: A (Amperes)
+    - Area: m² (square meters)
+    - Efficiency: % (percentage)
+
+    Cycle Summary Columns (cycle_data property):
+        cycle_number: Cycle index
+        Q_pos_total: Total positive charge
+        Q_neg_total: Total negative charge
+        E_pos_total: Total positive energy
+        E_neg_total: Total negative energy
+        V_cell_avg_charge: Average cell voltage during charge
+        V_cell_avg_discharge: Average cell voltage during discharge
+        I_cell_avg_charge: Average cell current during charge
+        I_cell_avg_discharge: Average cell current during discharge
+        Q_charge: Charge capacity
+        Q_discharge: Discharge capacity
+        E_charge: Charge energy
+        E_discharge: Discharge energy
+        CE: Coulombic efficiency
+        VE: Voltage efficiency
+        EE: Energy efficiency
+
+    Time Series Columns (time_series property):
+        time: Absolute time
+        V_cell: Cell voltage
+        dq: Charge increment
+        cycle_number: Cycle index
+        I_mode: Current mode ('positive', 'negative', or 'ocv')
+        dt: Time increment
+        I_cell: Cell current
+        dE: Energy increment
+        Vdt: Voltage × time increment
+        Q_pos: Cumulative positive charge
+        Q_neg: Cumulative negative charge
+        E_pos: Cumulative positive energy
+        E_neg: Cumulative negative energy
+    """
 
     def __init__(
         self,
@@ -12,7 +56,14 @@ class CyclingData:
         time_series: pd.DataFrame | None = None,
         label: str | None = None,
     ) -> None:
-        """ """
+        """
+        Initialize CyclingData container.
+
+        Parameters:
+            cycle_data: DataFrame with per-cycle summary data
+            time_series: DataFrame with full time-series data
+            label: Optional label for this dataset
+        """
         self.label = label
 
         self.area: float | None = None  # electrode geometric area in m2 if known
@@ -224,7 +275,7 @@ class CyclingData:
 
     def add_computed_metrics(self, **metrics):
         """
-        Add additional computed metrics to existing cycle data.
+        Add additional computed metrics to existing cycle data. Useful for plotting of custom properties against cycle number.
 
         Parameters:
             **metrics: Keyword arguments for new metric arrays
@@ -285,6 +336,46 @@ class CyclingData:
             raise ValueError(f"No summary data found for cycle {cycle_num}")
 
         return cycle_rows.iloc[0]
+
+    def filter_cycles(self, cycle_numbers: np.ndarray | list) -> None:
+        """
+        Filter the cycling data to retain only specified cycles.
+
+        This method trims both _cycle_summary and _full_data to only include
+        the cycles specified in cycle_numbers. The filtering is done in-place,
+        modifying the object's internal data.
+
+        Parameters:
+            cycle_numbers: Array or list of cycle numbers to retain
+
+        Raises:
+            ValueError: If filtering results in no data
+        """
+        # Convert to numpy array if list is provided
+        if isinstance(cycle_numbers, list):
+            cycle_numbers = np.array(cycle_numbers)
+
+        # Filter cycle summary
+        if not self._cycle_summary.empty:
+            self._cycle_summary = self._cycle_summary[
+                self._cycle_summary["cycle_number"].isin(cycle_numbers)
+            ].reset_index(drop=True)
+
+        # Filter full time series data
+        if self._full_data is not None:
+            self._full_data = self._full_data[
+                self._full_data["cycle_number"].isin(cycle_numbers)
+            ].reset_index(drop=True)
+
+        # Validate that we retained some data
+        has_cycle_data = not self._cycle_summary.empty
+        has_timeseries_data = self._full_data is not None and not self._full_data.empty
+
+        if not (has_cycle_data or has_timeseries_data):
+            raise ValueError(
+                f"Filtering by cycles {cycle_numbers} resulted in no data. "
+                "Check that the cycle numbers exist in the data."
+            )
 
     def _validate(self) -> None:
         """Validate the cycling data for consistency."""
