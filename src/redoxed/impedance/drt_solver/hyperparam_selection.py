@@ -1,3 +1,9 @@
+# Based on code from https://github.com/ciuccislab/pyDRTtools and https://github.com/vyrjana/pyimpspec
+# This module uses Tikhonov regularization and either radial basis function or piecewise linear discretization
+# - 10.1016/j.electacta.2015.09.097 # radial basis functions for DRT
+# - 10.1149/1945-7111/acbca4 # hyperparameter selection
+# - 10.1021/acselectrochem.5c00334 # DRTtools
+
 from typing import Callable, Dict
 from numpy.typing import NDArray
 from numpy import array, concatenate, exp, eye, trace, zeros, float64

@@ -69,50 +69,6 @@ class BaseLoader(ABC):
         # Split off the extension
         self.name, _ = os.path.splitext(base)
 
-    # def __validate_data__(self):
-    #     """
-    #     Validate the loaded data.
-    #     """
-    #     # Check if data arrays are set
-    #     if self.Z_re is None or self.Z_im is None or self.f is None:
-    #         raise ValueError(
-    #             "The Real (Z_re), Imaginary (Z_im) impedance, and frequency (f) arrays must be provided."
-    #         )
-
-    #     # Check if all arrays are the same length
-    #     if len(self.Z_re) != len(self.Z_im) or len(self.Z_re) != len(self.f):
-    #         raise ValueError("Z_re, Z_im, and f must all have the same length.")
-
-    #     # Check if frequencies are positive
-    #     if jnp.any(self.f <= 0):
-    #         raise ValueError("Frequencies (f) must be strictly positive.")
-
-    #     # Check if arrays are non-empty
-    #     if self.Z_re.size == 0 or self.Z_im.size == 0 or self.f.size == 0:
-    #         raise ValueError("Z_re, Z_im, and f arrays must not be empty.")
-
-    #     # Check if arrays are numeric
-    #     if not jnp.issubdtype(self.Z_re.dtype, jnp.floating):
-    #         raise TypeError("Z_re must be a numeric array (floating-point).")
-    #     if not jnp.issubdtype(self.Z_im.dtype, jnp.floating):
-    #         raise TypeError("Z_im must be a numeric array (floating-point).")
-    #     if not jnp.issubdtype(self.f.dtype, jnp.floating):
-    #         raise TypeError("f must be a numeric array (floating-point).")
-
-    #     # Check for NaN or infinite values - couldn't be arsed testing these all.
-    #     if jnp.any(jnp.isnan(self.Z_re)) or jnp.any(jnp.isinf(self.Z_re)):
-    #         raise ValueError("Z_re contains NaN or infinite values.")
-    #     if jnp.any(jnp.isnan(self.Z_im)) or jnp.any(jnp.isinf(self.Z_im)):
-    #         raise ValueError("Z_im contains NaN or infinite values.")
-    #     if jnp.any(jnp.isnan(self.f)) or jnp.any(jnp.isinf(self.f)):
-    #         raise ValueError("f contains NaN or infinite values.")
-
-    #     # Check for valid impedance values (complex number conditions)
-    #     if jnp.any(self.Z_re == 0) and jnp.any(self.Z_im == 0):
-    #         raise ValueError(
-    #             "Impedance values should not all be zero in both real and imaginary parts."
-    #         )
-
 
 class BiologicLoader(BaseLoader):
     """Loader for Biologic files.
@@ -196,7 +152,7 @@ class BiologicLoader(BaseLoader):
                         )
                 elif (
                     method == "yadg"
-                ):  # generally has more complete metadata and other data within the file, but it is less robust
+                ):  # yadg generally has more complete metadata and other data within the file, but it is less robust
                     try:
                         dt = yadg.extractors.extract(filetype="eclab.mpr", path=fpath)
                         self.metadata = dt.attrs

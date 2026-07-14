@@ -1,16 +1,43 @@
 # redoxED
 
-A Python package for electrochemical data analysis and visualization.
+A Python package for electrochemical data analysis and visualisation.
+
+![PyPI - Python Version](https://img.shields.io/pypi/pyversions/redoxED)
+[![GitHub](https://img.shields.io/github/license/ESaundersNano/redoxED)](https://www.gnu.org/licenses/gpl-3.0.html)
+[![PyPI](https://img.shields.io/pypi/v/redoxED)](https://pypi.org/project/redoxED/)
+
+
+## Table of contents
+
+- [Installation](#installation)
+- [About](#about)
+- [Contributing](#citingcontributing)
+- [Changelog](#changelog)
+- [License](#license)
 
 ## Installation
 
 To be added
 
-## LaTeX Rendering
+## About
+
+See [notebooks](https://github.com/ESaundersNano/redoxED/tree/main/notebooks) for demonstration of main features.
+
+### DRT Analysis
+
+
+An open, transparent, and configurable implementation of DRT developed to support our work.
+Based on code from https://github.com/ciuccislab/pyDRTtools and https://github.com/vyrjana/pyimpspec
+This module uses Tikhonov regularization and either radial basis function or piecewise linear discretization
+- 10.1016/j.electacta.2015.09.097 # radial basis functions for DRT
+- 10.1149/1945-7111/acbca4 # hyperparameter selection
+- 10.1021/acselectrochem.5c00334 # DRTtools
+
+### LaTeX Rendering
 
 redoxED supports LaTeX rendering for publication-quality plots with mathematical notation. 
 
-### Prerequisites
+#### Prerequisites
 
 **For LaTeX rendering to work properly, you need a complete LaTeX distribution installed on your system.** We recommend installing **TeX Live** (cross-platform) or **MiKTeX** (Windows).
 
@@ -18,7 +45,7 @@ redoxED supports LaTeX rendering for publication-quality plots with mathematical
 - **macOS**: Install MacTeX (TeX Live for Mac): https://www.tug.org/mactex/
 - **Windows**: Install TeX Live or MiKTeX: https://www.tug.org/texlive/ or https://miktex.org/
 
-### Global LaTeX Configuration
+#### Global LaTeX Configuration
 
 You can enable or disable LaTeX rendering globally for all plots:
 
@@ -35,7 +62,7 @@ config.set_latex_mode(False)
 print(config.get_config())
 ```
 
-### Per-Plot LaTeX Control
+#### Per-Plot LaTeX Control
 
 You can override the global setting for individual plots:
 
@@ -52,7 +79,7 @@ plot2 = NyquistPlot(usetex=False)
 plot3 = NyquistPlot(usetex=True)
 ```
 
-### Important Notes
+#### Important Notes
 
 ⚠️ **Mixed LaTeX Usage Warning**: Do not mix `usetex=True` and `usetex=False` plots in the same Python session/notebook cell, as matplotlib's global settings will cause one to overwrite the other's font settings. Set the global configuration once at the beginning of your session.
 
@@ -74,3 +101,17 @@ plot2 = DRTPlot()
 plot1 = NyquistPlot(usetex=True)   # Uses LaTeX
 plot2 = NyquistPlot(usetex=False)  # Font settings may be inconsistent
 ```
+
+## Citing/Contributing
+This code was developed primarily for the PhD of Edward Saunders and further active development is not currently planned. 
+Under the license, others are free to install the library, clone the repo for their own use, or duplicate the repo to make their own version if they appropriately credit this work.  
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for details.
+
+## License
+
+Copyright 2026 Edward Saunders
+
+redoxED is licensed under the [GPLv3 or later](https://www.gnu.org/licenses/gpl-3.0.html).

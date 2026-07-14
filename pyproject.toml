@@ -1,45 +1,36 @@
-[build-system]
-requires = ["setuptools>=61.0", "wheel"]
-build-backend = "setuptools.build_meta"
-
 [project]
-name = "redoxed"
+name = "redoxED"
 version = "0.1.0"
-description = "A Python package for electrochemistry data analysis and DRT modeling"
-authors = [
-    { name = "ES758", email = "es758@cam.ac.uk" }
-]
-license = { text = "MIT" }
+description = "A Python package for electrochemical data analysis and visualisation."
 readme = "README.md"
-requires-python = ">=3.8"
-
-# Only direct dependencies (packages directly imported in your code)
+authors = [
+    { name = "ESaundersNano", email = "95654485+ESaundersNano@users.noreply.github.com" }
+]
+requires-python = ">=3.12"
 dependencies = [
-    "numpy",
-    "pandas",
-    "matplotlib",
-    "scipy",
-    "lmfit",
-    "pyimpspec",
-    "galvani",
-    "cvxopt",
+    "cvxopt>=1.3.3",
+    "galvani>=0.5.0",
+    "lmfit>=1.3.4",
+    "matplotlib>=3.11.0",
+    "numpy>=2.5.1",
+    "pandas>=3.0.3",
+    "scikit-learn>=1.9.0",
+    "scipy>=1.18.0",
+    "seaborn>=0.13.2",
+    "yadg>=6.2.2",
 ]
 
 [project.urls]
 Homepage = "https://github.com/ESaundersNano/redoxED"
 Repository = "https://github.com/ESaundersNano/redoxED.git"
 
-[tool.setuptools]
-package-dir = {"" = "src"}
+[build-system]
+requires = ["uv_build>=0.11.28,<0.12.0"]
+build-backend = "uv_build"
 
-[tool.setuptools.packages.find]
-where = ["src"]
-namespaces = false
-
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
-    "pytest>=7.0",
-    "jupyter>=1.0",
-    "ipykernel>=6.0",
-    "black>=23.0",
+    "jupyterlab>=4.6.1",
+    "pyimpspec>=5.1.3",
+    "sphinx>=9.1.0",
 ]

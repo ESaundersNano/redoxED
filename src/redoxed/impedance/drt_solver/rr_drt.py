@@ -1,28 +1,8 @@
-# pyimpspec is licensed under the GPLv3 or later (https://www.gnu.org/licenses/gpl-3.0.html).
-# Copyright 2025 pyimpspec developers
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
-# The licenses of pyimpspec's dependencies and/or sources of portions of code are included in
-# the LICENSES folder.
-
+# Based on code from https://github.com/ciuccislab/pyDRTtools and https://github.com/vyrjana/pyimpspec
 # This module uses Tikhonov regularization and either radial basis function or piecewise linear discretization
-# - 10.1016/j.electacta.2015.09.097
-# - 10.1016/j.electacta.2015.03.123
-# - 10.1016/j.electacta.2017.07.050
-# Based on code from https://github.com/ciuccislab/pyDRTtools.
-# pyDRTtools commit: 1653298d52183c36ec941197ae59399b9dc85579
+# - 10.1016/j.electacta.2015.09.097 # radial basis functions for DRT
+# - 10.1149/1945-7111/acbca4 # hyperparameter selection
+# - 10.1021/acselectrochem.5c00334 # DRTtools
 
 import numpy as np
 from multiprocessing import get_context

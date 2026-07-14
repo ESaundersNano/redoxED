@@ -402,7 +402,7 @@ class CyclingData:
     def cycles(self) -> np.ndarray:
         """Array of available cycle numbers"""
         if not self._cycle_summary.empty:
-            return self._cycle_summary["cycle"].values
+            return self._cycle_summary["cycle_number"].values
         elif self._full_data is not None:
             return self._full_data[self.cycle_column].unique()
         else:

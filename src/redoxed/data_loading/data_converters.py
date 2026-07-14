@@ -11,7 +11,14 @@ def df_to_EISData(
     label: str | None = None,
     column_mapping: dict[str, str | None] | None = None,
 ) -> EISData:
-    """ """
+    """
+    Custom function that works to convert a DataFrame generated from EClab files to an EISData object.
+    The function assumes that the DataFrame contains columns for the real and imaginary parts of the impedance,
+    as well as the frequency. The column names can be specified using the `column_mapping` argument,
+    which is a dictionary mapping the expected column names to the actual column names in the DataFrame.
+    This can be used to convert DataFrames with different column names to the expected format for EISData (i.e., from other file types).
+    If no mapping is provided, default column names are assumed.
+    """
     # Set default column names (EClab file assumed)
     default_mapping = {
         "Z_re": "Re(Z)/Ohm",
@@ -54,6 +61,7 @@ def df_to_EISData(
     return EISData(Z, f, label=label)
 
 
+# unlike df_to_EISData, this function is specific to Biologic GCPL data format/default units and not intended to be flexible to other formats. Users likely have to write their own for other file formats.
 def df_to_CyclingData(
     df: pd.DataFrame,
     label: str | None = None,
@@ -90,6 +98,7 @@ def df_to_CyclingData(
     )
 
 
+# unlike df_to_EISData, this function is specific to Biologic GCPL data format/default units and not intended to be flexible to other formats. Users likely have to write their own for other file formats.
 def df_to_PolarisationData(
     df: pd.DataFrame,
     A: float = 5,  # cm2
@@ -137,6 +146,7 @@ def df_to_PolarisationData(
     return PolarisationData(V, j, A, label=label)
 
 
+# unlike df_to_EISData, this function is specific to Biologic GCPL data format/default units and not intended to be flexible to other formats. Users likely have to write their own for other file formats.
 def df_to_PolarisationData2(
     df: pd.DataFrame,
     A: float = 5,  # cm2
