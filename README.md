@@ -5,6 +5,7 @@ A Python package for electrochemical data analysis and visualisation.
 ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/redoxED)
 [![GitHub](https://img.shields.io/github/license/ESaundersNano/redoxED)](https://www.gnu.org/licenses/gpl-3.0.html)
 [![PyPI](https://img.shields.io/pypi/v/redoxED)](https://pypi.org/project/redoxED/)
+<!-- Add in similar for tests and build? -->
 
 
 ## Table of contents
@@ -17,7 +18,17 @@ A Python package for electrochemical data analysis and visualisation.
 
 ## Installation
 
-To be added
+The simplest terminal installation is to simply run:
+
+```console
+pip install redoxED
+```
+
+Alternatively, to use an editable local repository, clone this repository, navigate to the directory with pyproject.toml in terminal and use:
+
+```console
+pip install -e .
+```
 
 ## About
 
