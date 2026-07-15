@@ -1,11 +1,29 @@
+"""Container for impedance fitting residuals with cartesian and polar representations."""
+
 import numpy as np
 
 
 class ResidualsData:
     """
-    Container for residuals data, similar to CyclingData.
-    Can be initialized empty or with frequency, residuals, and relative residuals.
-    Stores absolute and relative residuals for real and imaginary parts if provided.
+    Container for impedance fitting residuals data.
+
+    Stores residuals computed between observed and predicted impedance spectra in both
+    absolute and relative (percentage) forms, with representations in both cartesian
+    (real/imaginary) and polar (magnitude/phase) coordinates.
+
+    Attributes:
+        f (NDArray[float64] | None): Frequency data in Hz (Hertz).
+        residuals (NDArray[complex128] | None): Complex residuals (observed - predicted).
+        residuals_rel (NDArray[complex128] | None): Complex residuals as percentage (%).
+        residuals_re (NDArray[float64] | None): Real part residuals in Ω (Ohms).
+        residuals_im (NDArray[float64] | None): Imaginary part residuals in Ω (Ohms).
+        residuals_re_rel (NDArray[float64] | None): Real part residuals as percentage (%).
+        residuals_im_rel (NDArray[float64] | None): Imaginary part residuals as percentage (%).
+        residuals_mag (NDArray[float64] | None): Magnitude residuals in Ω (Ohms).
+        residuals_phase (NDArray[float64] | None): Phase residuals in degrees.
+        residuals_mag_rel (NDArray[float64] | None): Magnitude residuals as percentage (%).
+        residuals_phase_rel (NDArray[float64] | None): Phase residuals as percentage (%).
+        label (str | None): Optional label for this dataset.
     """
 
     def __init__(
@@ -22,7 +40,24 @@ class ResidualsData:
         residuals_mag_rel: np.ndarray | None = None,
         residuals_phase_rel: np.ndarray | None = None,
         label: str | None = None,
-    ):
+    ) -> None:
+        """
+        Initialize ResidualsData container.
+
+        Parameters:
+            f (NDArray[float64] | None): Frequency data in Hz (Hertz). Defaults to None.
+            residuals (NDArray[complex128] | None): Complex residuals. Defaults to None.
+            residuals_rel (NDArray[complex128] | None): Complex residuals as percentage. Defaults to None.
+            residuals_re (NDArray[float64] | None): Real part residuals in Ω (Ohms). Defaults to None.
+            residuals_im (NDArray[float64] | None): Imaginary part residuals in Ω (Ohms). Defaults to None.
+            residuals_re_rel (NDArray[float64] | None): Real part residuals as percentage (%). Defaults to None.
+            residuals_im_rel (NDArray[float64] | None): Imaginary part residuals as percentage (%). Defaults to None.
+            residuals_mag (NDArray[float64] | None): Magnitude residuals in Ω (Ohms). Defaults to None.
+            residuals_phase (NDArray[float64] | None): Phase residuals in degrees. Defaults to None.
+            residuals_mag_rel (NDArray[float64] | None): Magnitude residuals as percentage (%). Defaults to None.
+            residuals_phase_rel (NDArray[float64] | None): Phase residuals as percentage (%). Defaults to None.
+            label (str | None): Optional label for this dataset. Defaults to None.
+        """
         self.f = f
         self.residuals = residuals
         self.residuals_rel = residuals_rel
@@ -37,12 +72,25 @@ class ResidualsData:
         self.label = label
 
     @classmethod
-    def calculate_residuals(cls, observed, predicted, label: str | None = None):
+    def calculate_residuals(
+        cls, observed, predicted, label: str | None = None
+    ) -> "ResidualsData":
         """
-        Calculate residuals from two EISData objects.
-        observed: EISData (experimental or measured)
-        predicted: EISData (model or fit)
-        Returns ResidualsData with all residuals calculated, including magnitude and phase (degrees).
+        Calculate residuals between observed and predicted impedance data.
+
+        Computes residuals in both absolute (Ohms) and relative (percentage) forms,
+        and in both cartesian (real/imaginary) and polar (magnitude/phase) representations.
+
+        Parameters:
+            observed: EISData object with observed impedance measurements.
+            predicted: EISData object with predicted/fitted impedance values.
+            label (str | None): Optional label for the residuals dataset. Defaults to None.
+
+        Returns:
+            ResidualsData: New ResidualsData object with all residuals calculated.
+
+        Raises:
+            ValueError: If input objects lack required 'f' and 'Z' attributes.
         """
         f = getattr(observed, "f", None)
         Z_obs = getattr(observed, "Z", None)
@@ -76,6 +124,12 @@ class ResidualsData:
         )
 
     def __repr__(self) -> str:
+        """
+        String representation of the ResidualsData object.
+
+        Returns:
+            str: Detailed representation showing which residual arrays are populated.
+        """
         return (
             f"ResidualsData(label={self.label!r}, "
             f"f={'set' if self.f is not None else 'None'}, "
@@ -93,8 +147,10 @@ class ResidualsData:
 
     def _validate(self) -> None:
         """
-        Validate that all provided arrays have matching lengths (if not None).
-        Raises ValueError if any mismatch is found.
+        Validate that all non-None arrays have consistent length.
+
+        Raises:
+            ValueError: If arrays with different lengths are present.
         """
         arrays = [
             self.f,

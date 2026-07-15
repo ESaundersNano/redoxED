@@ -1,26 +1,30 @@
+"""Utility functions for DRT analysis including Havriliak-Negami impedance."""
+
 import numpy as np
 from numpy import float64, complex128
 from numpy.typing import NDArray
 
 
-def extend_logspace_f(f, new_f_min, new_f_max):
+def extend_logspace_f(
+    f: NDArray[float64], new_f_min: float, new_f_max: float
+) -> NDArray[float64]:
     """
-    Extends a descending, uniformly log-spaced frequency vector to new limits,
-    continuing the same log spacing.
+    Extend a log-spaced frequency vector to new limits maintaining uniform spacing.
 
-    Parameters
-    ----------
-    f : np.ndarray
-        Original frequency vector (descending, uniformly log-spaced).
-    new_f_min : float
-        New minimum frequency (lowest value).
-    new_f_max : float
-        New maximum frequency (highest value).
+    Extends a descending, uniformly log-spaced frequency array to specified limits
+    while maintaining the original logarithmic spacing.
 
-    Returns
-    -------
-    np.ndarray
-        Extended frequency vector, descending, uniformly log-spaced.
+    Parameters:
+        f (NDArray[float64]): Original frequency vector in Hz (Hertz), descending, uniformly log-spaced.
+        new_f_min (float): New minimum frequency in Hz (Hertz) (lowest value).
+        new_f_max (float): New maximum frequency in Hz (Hertz) (highest value).
+
+    Returns:
+        NDArray[float64]: Extended frequency vector in Hz (Hertz), descending, uniformly log-spaced.
+
+    Raises:
+        ValueError: If f is not in descending order.
+        ValueError: If f is not uniformly log-spaced (within 1% tolerance).
     """
     f = np.asarray(f)
     if not np.all(np.diff(f) < 0):
@@ -62,41 +66,31 @@ def HN_Z(
     beta: float64,
 ) -> complex | NDArray[complex128]:
     """
-    Calculate the Havriliak-Negami impedance.
+    Calculate Havriliak-Negami (HN) impedance function.
 
-    Parameters
-    ----------
-    omega : float or np.ndarray
-        Angular frequency (rad/s)
-    Z0 : float
-        Characteristic impedance magnitude (Ohm)
-    tau0 : float
-        Characteristic time constant (s)
-    alpha : float
-        Shape parameter (0 < alpha <= 1)
-        Controls the symmetric broadening of the peak
-    beta : float
-        Shape parameter (0 < beta <= 1)
-        Controls the asymmetric broadening of the peak
+    Implements the generalized HN model that encompasses multiple impedance response
+    models (Debye, Cole-Cole, Cole-Davidson, Gerischer) through shape parameters.
 
-    Returns
-    -------
-    complex or np.ndarray
-        Complex impedance Z(ω)
+    Parameters:
+        omega (float | NDArray[float64]): Angular frequency in rad/s (radians per second).
+        Z0 (float64): Characteristic impedance magnitude in Ω (Ohms).
+        tau0 (float64): Characteristic relaxation time in s (seconds).
+        alpha (float64): Symmetric broadening parameter (0 < alpha ≤ 1).
+            Controls peak width symmetry: alpha=1 for sharp, alpha<1 for broad.
+        beta (float64): Asymmetric broadening parameter (0 < beta ≤ 1).
+            Controls peak asymmetry: beta=1 for symmetric, beta<1 for asymmetric.
 
-    Notes
-    -----
-    Implements equation for Havriliak Negami impedance:
-    Z(ω) = Z0 / (1 + (jωτ0)^α)^β
-    From:
-    Boukamp, B. A.; Rolle, A. "Use of a Distribution Function of Relaxation Times (DFRT) in Impedance Analysis of SOFC Electrodes." Solid State Ionics 2018, 314, 103–111. https://doi.org/10.1016/j.ssi.2017.11.021
-    See Eq. 8.
+    Returns:
+        complex | NDArray[complex128]: Complex impedance Z(ω) in Ω (Ohms).
 
-    Special cases:
-    - α=1, β=1: Debye (single time constant) AKA RC element
-    - α<1, β=1: Cole-Cole (symmetric peak broadening) AKA RQ or ZARC element
-    - α=1, β<1: Cole-Davidson (asymmetric peak broadening)
-    - α=0.5, β=1: Gerischer element (semi-infinite diffusion)
+    Notes:
+        Equation: Z(ω) = Z0 / (1 + (jωτ0)^α)^β
+        Special cases:
+        - alpha=1, beta=1: Debye (single RC element)
+        - alpha<1, beta=1: Cole-Cole (ZARC element)
+        - alpha=1, beta<1: Cole-Davidson
+        - alpha=0.5, beta=1: Gerischer (semi-infinite diffusion)
+        Reference: Boukamp & Rolle (2018), https://doi.org/10.1016/j.ssi.2017.11.021
     """
     # Enforce parameter bounds
     if not (0 < alpha <= 1):

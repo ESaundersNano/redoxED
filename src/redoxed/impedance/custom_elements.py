@@ -1,6 +1,10 @@
-# if import this file, can use custom elements defined herein.
+"""Custom electrochemical circuit elements and impedance functions.
 
-import numpy as np
+Provides user-defined circuit elements for pyimpspec (e.g., SomeNewElement) and
+custom impedance models including Transmission Line Model (TLM) implementations
+for porous electrodes with various boundary conditions.
+"""
+
 from numpy import pi, inf
 from numpy import float64, complex128
 from numpy.typing import NDArray
@@ -24,7 +28,24 @@ pyimpspec.circuit.registry.reset(
 
 
 class SomeNewElement(Element):
+    """User-defined circuit element implementing a power law impedance.
+
+    Attributes:
+        X (float): Impedance magnitude parameter with custom units.
+        a (float): Exponent parameter controlling frequency dependence (0 < a \u2264 1).
+    """
+
     def _impedance(self, f: Frequencies, X: float, a: float) -> ComplexImpedances:
+        """Calculate impedance as a function of frequency and parameters.
+
+        Parameters:
+            f (Frequencies): Frequencies in Hz (Hertz).
+            X (float): Impedance magnitude in custom units.
+            a (float): Exponent for frequency dependence (dimensionless).
+
+        Returns:
+            ComplexImpedances: Complex impedance Z(f) in custom units.
+        """
         return 1 / (X * (1j * 2 * pi * f) ** a)
 
 
@@ -87,65 +108,39 @@ def TLM_Z(
     """
     Calculate the Transmission Line Model (TLM) impedance for porous electrodes.
 
-    Parameters
-    ----------
-    omega : float or np.ndarray
-        Angular frequency (rad/s)
-    T : float
-        Temperature (K)
-    i_0 : float
-        Exchange current density (A/cm²)
-    a : float
-        Nernstian diffusion layer thickness (cm)
-    geom_factor : float
-        Geometry factor for shape and form of pores (dimensionless)
-    c_R : float
-        Bulk concentration of reduced species (mol/cm³)
-    D_R : float
-        Diffusion coefficient of reduced species (cm²/s)
-    c_O : float
-        Bulk concentration of oxidized species (mol/cm³)
-    D_O : float
-        Diffusion coefficient of oxidized species (cm²/s)
-    C_dl : float
-        Area-specific double layer capacitance (F/cm²)
-    alpha : float
-        CPE power factor (0 < alpha ≤ 1, alpha=1 for ideal capacitor)
-    rho_i : float
-        Ionic resistivity (electrolyte specific resistivity × porosity) (Ohm·cm)
-    rho_e : float
-        Electronic resistivity (electrode resistivity) (Ohm·cm)
-    l : float
-        Electrode thickness (cm)
-    A : float
-        Geometric area (cm²)
-    A_s : float
-        Total internal surface area of electrode (cm²)
+    Implements the transmission line model for porous electrodes including charge transfer,
+    diffusion, and transport effects through the electrode structure.
 
-    Returns
-    -------
-    complex or np.ndarray
-        Complex impedance Z(ω) (Ohm)
+    Parameters:
+        omega (float | NDArray[float64]): Angular frequency in rad/s (radians per second).
+        T (float64): Temperature in K (Kelvin).
+        i_0 (float64): Exchange current density in A/cm² (amperes per square centimeter).
+        a (float64): Nernstian diffusion layer thickness in cm (centimeters).
+        geom_factor (float64): Geometry factor for pore shape and form (dimensionless).
+        c_R (float64): Bulk concentration of reduced species in mol/cm³ (moles per cubic centimeter).
+        D_R (float64): Diffusion coefficient of reduced species in cm²/s (square centimeters per second).
+        c_O (float64): Bulk concentration of oxidized species in mol/cm³ (moles per cubic centimeter).
+        D_O (float64): Diffusion coefficient of oxidized species in cm²/s (square centimeters per second).
+        C_dl (float64): Area-specific double layer capacitance in F/cm² (farads per square centimeter).
+        alpha (float64): CPE power factor (0 < alpha ≤ 1). alpha=1 for ideal capacitor.
+        rho_i (float64): Ionic resistivity in Ω·cm (ohm-centimeters).
+        rho_e (float64): Electronic resistivity in Ω·cm (ohm-centimeters).
+        l (float64): Electrode thickness in cm (centimeters).
+        A (float64): Geometric electrode area in cm² (square centimeters).
+        A_s (float64): Total internal surface area in cm² (square centimeters).
 
-    Notes
-    -----
-    Implements the Transmission Line Model (TLM) for porous electrodes.
-    Based on the model developed by Zawodzinski et al.
-    DOI: 10.1149/2.045406jes
+    Returns:
+        complex | NDArray[complex128]: Complex impedance Z(ω) in Ω (Ohms).
 
-    The model accounts for:
-    - Charge transfer resistance
-    - Diffusion impedance (Warburg-like) for both oxidized and reduced species
-    - Double layer capacitance (with CPE behavior)
-    - Ionic and electronic transport through the porous structure
-
-    Physical constants used:
-    - R = 8.31 J/(mol·K) - Universal gas constant
-    - F = 9.64853321233100184e4 C/mol - Faraday constant
-
-    The impedance Z_s represents the surface-specific impedance (Ohm·cm²),
-    which is then combined with the transmission line effects to give
-    the overall electrode impedance.
+    Notes:
+        Model accounts for:
+        - Charge transfer resistance and kinetics
+        - Diffusion impedance (Warburg-like) for redox species
+        - Double layer capacitance (CPE behavior via alpha parameter)
+        - Ionic transport through electrolyte phase
+        - Electronic transport through electrode matrix
+        Constants: R = 8.31 J/(mol·K), F = 96485.33212 C/mol
+        Reference: Zawodzinski et al. DOI: 10.1149/2.045406jes
     """
     # Physical constants
     R = 8.31  # Gas constant (J/(mol·K)) = kg·m²·s⁻²·K⁻¹·mol⁻¹
@@ -203,75 +198,45 @@ def TLM_Z_2(
     beta: float64 = 0.5,
 ) -> complex | NDArray[complex128]:
     """
-    Calculate the Transmission Line Model (TLM) impedance for porous electrodes.
+    Calculate the Transmission Line Model (TLM) impedance for porous electrodes with flexible boundary conditions.
 
-    Parameters
-    ----------
-    omega : float or np.ndarray
-        Angular frequency (rad/s)
-    reflective_bc : bool
-        If True, applies reflective boundary conditions at the pores as well as transmissive boundary.
-    T : float
-        Temperature (K)
-    k_0 : float
-        Standard rate constant (cm/s)
-    n : int
-        Number of electrons transferred
-    beta : float
-        Charge transfer coefficient (0 < beta < 1)
-    a : float
-        Nernstian diffusion layer thickness (cm)
-    p : float
-        Size of pores (cm)
-    v : float
-        Fraction of surface that receives transmissive boundary condition (dimensionless). When reflective_bc is False, acts as geometry factor fudging constant.
-    c_R : float
-        Bulk concentration of reduced species (mol/cm³)
-    D_R : float
-        Diffusion coefficient of reduced species (cm²/s)
-    c_O : float
-        Bulk concentration of oxidized species (mol/cm³)
-    D_O : float
-        Diffusion coefficient of oxidized species (cm²/s)
-    q_dl : float
-        Area-specific double layer capacitance (F/cm²)
-    alpha : float
-        CPE power factor (0 < alpha ≤ 1, alpha=1 for ideal capacitor)
-    rho_i : float
-        Ionic resistivity (electrolyte specific resistivity × porosity) (Ohm·cm)
-    rho_e : float
-        Electronic resistivity (electrode resistivity x porosity) (Ohm·cm)
-    l : float
-        Electrode thickness (cm)
-    A : float
-        Geometric area (cm²)
-    A_s : float
-        Total internal surface area of electrode (cm²)
+    Implements the transmission line model for porous electrodes with support for reflective and
+    transmissive boundary conditions, including charge transfer, diffusion, and transport effects.
 
-    Returns
-    -------
-    complex or np.ndarray
-        Complex impedance Z(ω) (Ohm)
+    Parameters:
+        omega (float | NDArray[float64]): Angular frequency in rad/s (radians per second).
+        k_0 (float64): Standard rate constant in cm/s (centimeters per second).
+        a (float64): Nernstian diffusion layer thickness in cm (centimeters).
+        p (float64): Pore size in cm (centimeters).
+        v (float64): Fraction of surface with transmissive boundary condition (dimensionless, 0-1).
+        c_R (float64): Bulk concentration of reduced species in mol/cm³ (moles per cubic centimeter).
+        D_R (float64): Diffusion coefficient of reduced species in cm²/s (square centimeters per second).
+        c_O (float64): Bulk concentration of oxidized species in mol/cm³ (moles per cubic centimeter).
+        D_O (float64): Diffusion coefficient of oxidized species in cm²/s (square centimeters per second).
+        q_dl (float64): Area-specific double layer capacitance in F/cm² (farads per square centimeter).
+        alpha (float64): CPE power factor (0 < alpha ≤ 1). alpha=1 for ideal capacitor.
+        rho_i (float64): Ionic resistivity in Ω·cm (ohm-centimeters).
+        rho_e (float64): Electronic resistivity in Ω·cm (ohm-centimeters).
+        l (float64): Electrode thickness in cm (centimeters).
+        A (float64): Geometric electrode area in cm² (square centimeters).
+        A_s (float64): Total internal surface area in cm² (square centimeters).
+        reflective_bc (bool): If True, apply reflective boundary conditions; if False, transmissive only. Default: True.
+        T (float64): Temperature in K (Kelvin). Default: 298 K.
+        n (int): Number of electrons transferred. Default: 1.
+        beta (float64): Charge transfer coefficient (0 < beta < 1). Default: 0.5.
 
-    Notes
-    -----
-    Implements the Transmission Line Model (TLM) for porous electrodes, expanded for different boundary conditions.
-    Based on the model developed by Zawodzinski et al.
-    DOI: 10.1149/2.045406jes
+    Returns:
+        complex | NDArray[complex128]: Complex impedance Z(ω) in Ω (Ohms).
 
-    The model accounts for:
-    - Charge transfer resistance
-    - Diffusion impedance (Warburg-like) for both oxidized and reduced species
-    - Double layer capacitance (with CPE behavior)
-    - Ionic and electronic transport through the porous structure
-
-    Physical constants used:
-    - R = 8.31 J/(mol·K) - Universal gas constant
-    - F = 9.64853321233100184e4 C/mol - Faraday constant
-
-    The impedance Z_s represents the surface-specific impedance (Ohm·cm²),
-    which is then combined with the transmission line effects to give
-    the overall electrode impedance.
+    Notes:
+        Model accounts for:
+        - Charge transfer resistance and kinetics
+        - Semi-infinite diffusion impedance (Warburg-like) for redox species
+        - Finite diffusion impedance with boundary condition options
+        - Double layer capacitance (CPE behavior via alpha parameter)
+        - Ionic and electronic transport through porous electrode matrix
+        Constants: R = 8.31 J/(mol·K), F = 96485.33212 C/mol
+        Reference: Zawodzinski et al. DOI: 10.1149/2.045406jes
     """
     # Physical constants
     R = 8.31  # Gas constant (J/(mol·K)) = kg·m²·s⁻²·K⁻¹·mol⁻¹

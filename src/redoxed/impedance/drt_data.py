@@ -7,15 +7,23 @@ import copy
 
 class DRTData:
     """
-    A class to store and process Distribution of Relaxation Times (DRT) data.
+    Container for Distribution of Relaxation Times (DRT) analysis data.
+
+    Stores the DRT distribution (gamma vs tau) computed from impedance spectroscopy measurements.
+    The DRT provides a description of relaxation time distribution representing the electrochemical
+    processes occurring at different time scales.
 
     Attributes:
-        tau (np.ndarray): Array of relaxation times.
-        gamma (np.ndarray): Array of gamma values corresponding to tau.
-        label (Optional[str]): An optional label for the dataset.
+        tau (NDArray[float64]): Array of relaxation times in s (seconds).
+        gamma (NDArray[float64]): Distribution values (gamma in log-tau space) in Ω (Ohms).
+        label (str | None): Optional label for this dataset.
+        R0 (float64): Ohmic resistance in Ω (Ohms). NaN if not determined.
+        L0 (float64): Inductance in H (Henries). NaN if not determined.
+        C0 (float64): Capacitance in F (Farads). NaN if not determined.
 
     Notes:
-    Unless otherwise stated. It is always assumed that gamma refers to the gamma in log-tau space.
+        Unless otherwise stated, gamma refers to the DRT in log-tau space.
+        All quantities follow SI units except where explicitly noted.
     """
 
     tau: NDArray[float64]
@@ -32,8 +40,19 @@ class DRTData:
         R0: float64 = np.nan,
         L0: float64 = np.nan,
         C0: float64 = np.nan,
-        label=None,
+        label: str | None = None,
     ) -> None:
+        """
+        Initialize DRTData container.
+
+        Parameters:
+            tau (NDArray[float64]): Array of relaxation times in s (seconds).
+            gamma (NDArray[float64]): Array of gamma values (distribution in log-tau space) in Ω (Ohms).
+            R0 (float64): Ohmic resistance in Ω (Ohms). Defaults to NaN.
+            L0 (float64): Inductance in H (Henries). Defaults to NaN.
+            C0 (float64): Capacitance in F (Farads). Defaults to NaN.
+            label (str | None): Optional label for this dataset. Defaults to None.
+        """
         self.tau = tau
         self.gamma = gamma
         self.label = label
@@ -73,15 +92,14 @@ class DRTData:
 
     def get_pol_resistance(self) -> float64:
         """
-        Calculate the peak area (Zp) for this spectrum.
-        Parameters
-        ----------
+        Calculate the total polarization resistance (Zp) by integrating the DRT.
 
+        Computes the area under the gamma vs ln(tau) curve using trapezoidal integration.
+        The polarization resistance is the integral of gamma over the entire tau range
+        in log-tau space.
 
-        Returns
-        -------
-        float64
-            Area under the spectrum (Zp value).
+        Returns:
+            float64: Total polarization resistance (area under curve) in Ω (Ohms).
         """
         tau = self.tau.copy()
         gamma = self.gamma.copy()
@@ -96,24 +114,19 @@ class DRTData:
 
     def get_DRT_integral(self, tau_min: float, tau_max: float) -> float64:
         """
-        Calculate the polarization resistance integral between two specified tau values.
+        Calculate partial polarization resistance over a specified tau range.
 
-        This method computes the integral of gamma with respect to log(tau) over a specified
-        range. If tau values fall partially outside the range, only the available values
-        within [tau_min, tau_max] are used.
+        Computes the integral of gamma with respect to log(tau) between two specified
+        relaxation time values. Useful for isolating contributions from specific
+        electrochemical processes.
 
-        Parameters
-        ----------
-        tau_min : float
-            Minimum relaxation time (linear scale).
-        tau_max : float
-            Maximum relaxation time (linear scale).
+        Parameters:
+            tau_min (float): Minimum relaxation time in s (seconds) for integration range.
+            tau_max (float): Maximum relaxation time in s (seconds) for integration range.
 
-        Returns
-        -------
-        float64
-            Area under the spectrum between tau_min and tau_max (partial Zp value).
-            Returns np.nan if no tau values fall within the specified range.
+        Returns:
+            float64: Partial polarization resistance in Ω (Ohms) between tau_min and tau_max.
+                Returns NaN if no tau values fall within the specified range.
         """
         tau = self.tau.copy()
         gamma = self.gamma.copy()
@@ -139,6 +152,11 @@ class DRTData:
 
         return resistance_integral
 
-    def copy(self):
-        """Return a deep copy of this DRTData instance."""
+    def copy(self) -> "DRTData":
+        """
+        Return a deep copy of this DRTData instance.
+
+        Returns:
+            DRTData: A new independent copy of this object.
+        """
         return copy.deepcopy(self)

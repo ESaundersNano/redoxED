@@ -1,52 +1,54 @@
+"""Reconstruction of impedance from Distribution of Relaxation Times (DRT) data."""
+
 from scipy.integrate import quad, trapezoid
 import numpy as np
 
 
-def Z_from_DRT(f, gamma, tau=None, R0=np.nan, L0=np.nan, C0=np.nan, quad_opts=None):
+def Z_from_DRT(
+    f,
+    gamma,
+    tau=None,
+    R0=np.nan,
+    L0=np.nan,
+    C0=np.nan,
+    quad_opts=None,
+):
     """
-    Reconstruct impedance Z_DRT(f) from DRT using either analytic or vectorized gamma.
+    Reconstruct complex impedance from Distribution of Relaxation Times (DRT).
 
-    Parameters
-    ----------
-    f : float or np.ndarray
-        Frequency (Hz), can be scalar or array.
-    gamma : callable or np.ndarray
-        If callable: gamma(tau) returns DRT value for tau.
-        If array: vector of gamma values corresponding to tau.
-    tau : np.ndarray, optional
-        Array of tau values (required if gamma is array).
-    R0 : float, optional
-        Ohmic resistance (default 0.0)
-    L0 : float, optional
-        Inductance (default 0.0)
-    quad_opts : dict | None, optional
-        Dictionary of options to pass to scipy.integrate.quad for integrals.
-        May need to reduce a and b limits if getting integration warnings. Likely you just start getting numeric instability when interval is too large.
-        With typical peak sizes, limits of -20 to 5 are more than reasonable (1e-8 to 1e2 tau).
-        If None, uses:
-            {'epsabs': 1e-9, 'epsrel': 1e-9, 'limit': 100, 'a': -20, 'b': 20}
-        Valid keys:
+    Integrates the DRT distribution (gamma) over relaxation times to compute impedance
+    at specified frequency points. Supports both analytical (callable) and vectorized
+    (array) representations of gamma.
+
+    Parameters:
+        f (float | NDArray[float64]): Frequency data in Hz (Hertz). Can be scalar or array.
+        gamma (callable | NDArray[float64]): DRT distribution. If callable, gamma(tau) returns
+            DRT value for tau. If array, vector of gamma values corresponding to tau array.
+        tau (NDArray[float64] | None): Array of relaxation times in s (seconds). Required if
+            gamma is a vectorized array. Defaults to None.
+        R0 (float): Ohmic resistance in Ω (Ohms) to add in series. Defaults to NaN (not added).
+        L0 (float): Series inductance in H (Henries). Defaults to NaN (not added).
+        C0 (float): Series capacitance in F (Farads). Defaults to NaN (not added).
+        quad_opts (dict | None): Integration options dictionary. Supports keys:
             - 'epsabs': Absolute error tolerance (default: 1e-9)
             - 'epsrel': Relative error tolerance (default: 1e-9)
-            - 'limit': Maximum number of subintervals (default: 100)
-            - 'a': Lower integration limit (default: -50)
-            - 'b': Upper integration limit (default: 50)
-        Example:
-            quad_opts = {'epsabs': 1e-8, 'epsrel': 1e-8, 'limit': 200, 'a': -20, 'b': 5}
+            - 'limit': Maximum subintervals (default: 100)
+            - 'a': Lower integration limit in log-space (default: -20)
+            - 'b': Upper integration limit in log-space (default: 20)
+            Defaults to None (uses default options).
 
-    Returns
-    -------
-    Z_DRT : complex or np.ndarray
-        Reconstructed impedance at each frequency.
+    Returns:
+        complex | NDArray[complex128]: Complex impedance Z(ω) in Ω (Ohms) at each frequency.
+            Returns scalar if input f is scalar, array if f is array.
 
-    Notes
-    -----
-    If analytic gamma contains a singularity, integration will likely fail.
-    Vectorised gamma with trapezoidal integration is more robust in such cases.
+    Raises:
+        ValueError: If gamma is vectorized but tau is not provided.
 
+    Notes:
+        - Integration performed over log-tau space using change of variables: tau = exp(ln_tau)
+        - Vectorized integration using trapezoidal rule is more robust for singular gamma
+        - Suggested quad_opts limits: {'a': -20, 'b': 20} for typical peak sizes
     """
-    f = np.atleast_1d(f)
-    Z_DRT = np.zeros(f.shape, dtype=complex)
     # Default quad options
     default_opts = {"a": -20, "b": 20, "epsabs": 1e-9, "epsrel": 1e-9, "limit": 100}
     quad_opts = quad_opts or {}
@@ -54,6 +56,9 @@ def Z_from_DRT(f, gamma, tau=None, R0=np.nan, L0=np.nan, C0=np.nan, quad_opts=No
     a = opts["a"]
     b = opts["b"]
     quad_args = {k: v for k, v in opts.items() if k not in ["a", "b"]}
+
+    f = np.atleast_1d(f)
+    Z_DRT = np.zeros(f.shape, dtype=complex)
     if callable(gamma):
         for i, fi in enumerate(f):
 

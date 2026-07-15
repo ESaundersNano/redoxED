@@ -7,9 +7,8 @@
 """
 Quadratic Programming (QP) solver utilities for DRT computation.
 
-This module provides functions to set up and solve QP problems using CVXOPT/KVXOPT.
+Provides functions to set up and solve QP problems using CVXOPT/KVXOPT.
 The standard QP problem is formulated as:
-
     minimize    (1/2) x^T H x + c^T x
     subject to  G x <= h  (inequality constraints)
                 A x = b   (equality constraints)
@@ -19,6 +18,10 @@ For DRT computation, the least squares problem with Tikhonov regularization:
 is reformulated as a QP problem where:
     H = 2(A^T A + λM)
     c = -2b^T A
+
+References:
+    - CVXOPT: https://cvxopt.org/
+    - KVXOPT: https://github.com/rajatk/kvxopt
 """
 
 from redoxed import config

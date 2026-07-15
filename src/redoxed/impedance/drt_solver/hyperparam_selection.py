@@ -1,8 +1,15 @@
-# Based on code from https://github.com/ciuccislab/pyDRTtools and https://github.com/vyrjana/pyimpspec
-# This module uses Tikhonov regularization and either radial basis function or piecewise linear discretization
-# - 10.1016/j.electacta.2015.09.097 # radial basis functions for DRT
-# - 10.1149/1945-7111/acbca4 # hyperparameter selection
-# - 10.1021/acselectrochem.5c00334 # DRTtools
+"""Hyperparameter (regularization parameter) selection methods for DRT solver.
+
+Implements multiple criteria for automatic selection of Tikhonov regularization
+parameter (lambda) including Generalized Cross-Validation (GCV), modified GCV (mGCV),
+robust GCV (rGCV), and L-curve methods. Based on pyDRTtools and pyimpspec.
+
+Based on code from https://github.com/ciuccislab/pyDRTtools and https://github.com/vyrjana/pyimpspec
+References:
+    - Electrochimica Acta 2015, 10.1016/j.electacta.2015.09.097 (RBF-DRT)
+    - J. Electrochem. Soc. 2022, 10.1149/1945-7111/acbca4 (Hyperparameter selection)
+    - ACS ElectroChem. 2015, 10.1021/acselectrochem.5c00334 (DRTtools)
+"""
 
 from typing import Callable, Dict
 from numpy.typing import NDArray
@@ -27,8 +34,22 @@ from .utils import _is_positive_definite, _nearest_positive_definite
 from .qp import _quad_format, _solve_qp_cvxopt
 
 
-# prepares matrices to give to cost function
 def _gcv_wrapper(func: Callable) -> Callable:
+    """Decorator wrapping cost functions with matrix preparation for GCV-based methods.
+
+    Prepares concatenated impedance and discretization matrices for generalized
+    cross-validation and related regularization parameter selection methods.
+
+    Parameters:
+        func (Callable): Cost function computing GCV or variant score from processed matrices.
+
+    Returns:
+        Callable: Wrapper function accepting ln_lambda, impedance, and discretization matrices.
+
+    Notes:
+        Implementation follows Eq. 5 and 13 from DOI: 10.1149/1945-7111/acbca4
+    """
+
     def wrapper(
         ln_lambda: float64,
         A_re: NDArray[float64],
@@ -78,11 +99,22 @@ def _compute_generalized_cross_validation(
     K: NDArray[float64],
     Z_exp: NDArray[float64],
 ) -> float64:
-    """
-    This function computes the log of the score for the generalized cross-validation (GCV) approach.
-    Computing the log of the score is necessary for large M where the function becomes very flat.
+    """Compute generalized cross-validation (GCV) score for regularization parameter selection.
 
-    Reference: G. Wahba, A comparison of GCV and GML for choosing the smoothing parameter in the generalized spline smoothing problem, Ann. Statist. 13 (1985) 1378–1402.
+    Calculates log of GCV score; logarithmic transformation prevents underflow for large M.
+
+    Parameters:
+        M (int): Number of experimental data points (impedance measurements).
+        I (NDArray[float64]): Identity matrix in shape (2*M, 2*M).
+        K (NDArray[float64]): Influence matrix from regularized least squares.
+        Z_exp (NDArray[float64]): Stacked experimental impedance vector (real + imaginary) in Ω.
+
+    Returns:
+        float64: Log of GCV score (dimensionless). Lower values indicate better regularization.
+
+    References:
+        - Wahba, G. (1985). A comparison of GCV and GML. Ann. Statist. 13, 1378-1402.
+        - DOI: 10.1149/1945-7111/acbca4 Eq. 13
     """
     # See eq. 13 in https://doi.org/10.1149/1945-7111/acbca4
     num: float64 = (norm((I - K) @ Z_exp) ** 2) / (2 * M)
@@ -98,11 +130,28 @@ def _compute_modified_gcv(
     K: NDArray[float64],
     Z_exp: NDArray[float64],
 ) -> float64:
-    """
-    This function computes the log of the score for the modified generalized cross validation (mGCV) approach.
-    Computing the log of the score is necessary for large M where the function becomes very flat.
+    """Compute modified GCV (mGCV) score with stabilization parameter rho.
 
-    Reference: Y.J. Kim, C. Gu, Smoothing spline Gaussian regression: More scalable computation via efficient approximation, J. Royal Statist. Soc. 66 (2004) 337–356.
+    Calculates log of mGCV score; logarithmic transformation prevents underflow for large M.
+    Includes stabilization parameter rho based on data size for improved robustness.
+
+    Parameters:
+        M (int): Number of experimental data points (impedance measurements).
+        I (NDArray[float64]): Identity matrix in shape (2*M, 2*M).
+        K (NDArray[float64]): Influence matrix from regularized least squares.
+        Z_exp (NDArray[float64]): Stacked experimental impedance vector (real + imaginary) in Ω.
+
+    Returns:
+        float64: Log of mGCV score (dimensionless). Lower values indicate better regularization.
+
+    Notes:
+        Stabilization parameter rho:
+        - rho = 2.0 for M >= 50
+        - rho = 1.3 for M < 50
+
+    References:
+        - Kim, Y.J., Gu, C. (2004). Smoothing spline Gaussian regression. J. Royal Statist. Soc. 66, 337-356.
+        - DOI: 10.1149/1945-7111/acbca4 Eq. 14-15
     """
     # the stabilization parameter, rho, is computed as described by Kim et al.
     # See eq. 15 in https://doi.org/10.1149/1945-7111/acbca4
@@ -122,11 +171,29 @@ def _compute_robust_gcv(
     K: NDArray[float64],
     Z_exp: NDArray[float64],
 ) -> float64:
-    """
-    This function computes the log of the score for the robust generalized cross-validation (rGCV) approach.
-    Computing the log of the score is necessary for large M where the function becomes very flat.
+    """Compute robust GCV (rGCV) score with adaptive scaling parameter xi.
 
-    Reference: M. A. Lukas, F. R. de Hoog, R. S. Anderssen, Practical use of robust GCV and modified GCV for spline smoothing, Comput. Statist. 31 (2016) 269–289.
+    Calculates log of rGCV score; logarithmic transformation prevents underflow for large M.
+    Includes adaptive scaling parameter xi for increased robustness to outliers.
+
+    Parameters:
+        M (int): Number of experimental data points (impedance measurements).
+        I (NDArray[float64]): Identity matrix in shape (2*M, 2*M).
+        K (NDArray[float64]): Influence matrix from regularized least squares.
+        Z_exp (NDArray[float64]): Stacked experimental impedance vector (real + imaginary) in Ω.
+
+    Returns:
+        float64: Log of rGCV score (dimensionless). Lower values indicate better regularization.
+
+    Notes:
+        Scaling parameter xi:
+        - xi = 0.3 for M >= 50
+        - xi = 0.2 for M < 50
+        mu_2 is computed as trace(K.T @ K) / (2*M)
+
+    References:
+        - Lukas, M.A., de Hoog, F.R., Anderssen, R.S. (2016). Practical use of robust GCV. Comput. Statist. 31, 269-289.
+        - DOI: 10.1149/1945-7111/acbca4 Eq. 16
     """
     # See eq. 13 in https://doi.org/10.1149/1945-7111/acbca4
     num: float64 = (norm((I - K) @ Z_exp) ** 2) / (2 * M)
