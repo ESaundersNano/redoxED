@@ -40,8 +40,8 @@ Battery cycling data, EIS, and polarisation data can be loaded directly from raw
 ### DRT Analysis
 An open, transparent, and configurable implementation of distribution of relaxation times (DRT) analysis developed to support our work.
 
-DRT is calculated from EIS spectra, based on code from https://github.com/ciuccislab/pyDRTtools and https://github.com/vyrjana/pyimpspec. The main distinction from theses solvers is the ability to explicitly choose the time constants used for calculation, independent of the frequency points provided. By default, our solver uses (1/2$\pi f$) vs (1/f) used in these other implmentations. 
-DRT with lumped series capacitance is also implemented to support Li work. Additionally, all solver options (e.g. integration and optimisation algorithm choices) are made available for tuning by the user. 
+DRT is calculated from EIS spectra, based on code from https://github.com/ciuccislab/pyDRTtools and https://github.com/vyrjana/pyimpspec. The main distinction from theses solvers is the ability to explicitly choose the time constants used for calculation, independent of the frequency points provided. By default, our solver uses (1/2πf) vs (1/f) used in these other implmentations. 
+DRT with lumped series capacitance is also implemented to support Li work. Additionally, all solver options (e.g. integration and optimisation algorithm choices) are made available for tuning by the user. Notably, the regularisation parameter optimisation algorithm was found to be important to prevent λ from sticking to initial guesses. 
 
 Additional functionality allows for peak fitting and reconstructing impedance spectra. 
 
@@ -59,8 +59,6 @@ redoxED supports batch plotting of DC and AC figures including:
 - Nyquist and Bode plots
 - DRT spectra
 - Residuals plots for model fits.
-
-### LaTeX Rendering
 
 redoxED supports LaTeX rendering for publication-quality plots with mathematical notation. 
 
