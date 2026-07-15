@@ -7,6 +7,14 @@ class CyclingData:
     """
     Container for electrochemical cycling data with per-cycle summaries and full time-series data.
 
+    Attributes:
+    -----------
+        cycle_data (pd.DataFrame | None): DataFrame containing per-cycle summary data
+        time_series (pd.DataFrame | None): DataFrame containing full time-series data
+        label (str | None): Optional label for this dataset
+        area (float | None): Electrode geometric area in m² if known, added by set_area method
+
+
     All quantities are in SI units unless otherwise noted:
     - Voltage: V (Volts)
     - Charge: C (Coulombs)
@@ -60,9 +68,10 @@ class CyclingData:
         Initialize CyclingData container.
 
         Parameters:
-            cycle_data: DataFrame with per-cycle summary data
-            time_series: DataFrame with full time-series data
-            label: Optional label for this dataset
+        -----------
+            cycle_data (pd.DataFrame | None): DataFrame with per-cycle summary data
+            time_series (pd.DataFrame | None): DataFrame with full time-series data
+            label (str | None): Optional label for this dataset
         """
         self.label = label
 
@@ -89,6 +98,19 @@ class CyclingData:
     ) -> "CyclingData":
         """
         Create CyclingData from raw electrochemical arrays.
+
+        Parameters:
+        -----------
+            V_cell (np.ndarray): Cell voltage array
+            time (np.ndarray): Time array
+            dq (np.ndarray): Charge increment array
+            cycle_number (np.ndarray): Cycle number array
+            label (str | None): Optional label for this dataset
+            reverse_polarity (bool): Whether to reverse the polarity of the data
+
+        Returns:
+        -----------
+            CyclingData: An instance of the CyclingData class with computed metrics
         """
 
         def _classify_dq(dq_value):
@@ -267,7 +289,8 @@ class CyclingData:
         Set the electrode geometric area for current density calculations.
 
         Parameters:
-            area: Electrode area in m²
+        -----------
+            area (float): Electrode area in m²
         """
         if area <= 0:
             raise ValueError("Area must be a positive value.")
@@ -299,9 +322,11 @@ class CyclingData:
         Get all time-series data for a specific cycle.
 
         Parameters:
+        -----------
             cycle_num: The cycle number to extract
 
         Returns:
+        -----------
             DataFrame containing all time points for that cycle
         """
         if self._full_data is None:
@@ -323,9 +348,11 @@ class CyclingData:
         Get summary metrics for a specific cycle.
 
         Parameters:
+        -----------
             cycle_num: The cycle number to get summary for
 
         Returns:
+        -----------
             Series containing CE, VE, capacity, etc. for that cycle
         """
         if self._cycle_summary.empty:
@@ -346,9 +373,11 @@ class CyclingData:
         modifying the object's internal data.
 
         Parameters:
-            cycle_numbers: Array or list of cycle numbers to retain
+        -----------
+            cycle_numbers (np.ndarray | list): Array or list of cycle numbers to retain
 
         Raises:
+        -----------
             ValueError: If filtering results in no data
         """
         # Convert to numpy array if list is provided
