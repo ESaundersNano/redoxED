@@ -1,3 +1,25 @@
+"""DRT peak detection and decomposition using Havriliak-Negami and Skewed Gaussian models.
+
+This module provides functionality to identify peaks in Distribution of Relaxation Times (DRT)
+spectra and fit them with parametric models. Supports both Havriliak-Negami (HN) and
+Skewed Gaussian (SG) peak shapes with nonlinear least squares optimization.
+
+Main functions:
+    - find_DRT_peaks(): Detect local maxima in DRT spectrum
+    - fit_DRT_peaks(): Optimize peak parameters to fit experimental DRT data
+    - _generate_parameters(): Create lmfit Parameters with bounds for optimization
+    - _function(): Evaluate fitted DRT spectrum
+    - _residual(): Compute residuals for least squares optimization
+
+Main classes:
+    - DRTPeak: Single peak with parameters and evaluation methods
+    - DRTPeaks: Collection of peaks with aggregate analysis methods
+
+References:
+    - Havriliak-Negami impedance: https://doi.org/10.1145/1950
+    - DRT decomposition methods for EIS: https://doi.org/10.1016/j.electacta.2015.09.097
+"""
+
 from lmfit.minimizer import minimize, MinimizerResult
 from lmfit.parameter import Parameters
 import numpy as np
@@ -28,21 +50,32 @@ def find_DRT_peaks(
 ) -> List[Tuple[float, float]]:
     """
     Find peaks in the DRT spectrum using scipy.signal.find_peaks.
-    Returns a list of (tau, gamma) tuples for each peak found.
 
-    Parameters
-    ----------
-    DRTData_object : DRTData
-        DRT data object containing tau and gamma arrays.
-    num_peaks : int or None, optional
-        Number of peaks to keep (tallest). If None, keeps all found peaks.
-    find_peaks_settings : dict or None, optional
-        Dictionary of settings for scipy.signal.find_peaks.
+    Identifies local maxima in the gamma (DRT) spectrum and returns corresponding
+    (tau, gamma) tuples. Optionally filters to keep only the most prominent peaks.
 
-    Returns
-    -------
-    List[Tuple[float, float]]
-        List of (tau, gamma) tuples for each peak.
+    Parameters:
+        DRTData_object (DRTData): DRT data object containing tau and gamma arrays.
+        num_peaks (int | None): Number of tallest peaks to keep. If None, keeps all found peaks. Default: None.
+        find_peaks_settings (dict | None): Dictionary of settings for scipy.signal.find_peaks:
+            - height (float | tuple): Peak height requirement(s)
+            - threshold (float): Minimum difference to neighboring samples
+            - distance (int): Minimum sample distance between peaks
+            - prominence (float | tuple): Peak prominence requirement(s)
+            - width (float | tuple): Peak width requirement(s)
+            - wlen (int): Window length for evaluation
+            - rel_height (float): Relative height for width calculation (default: 0.5)
+            - plateau_size (int): Size of flat region at peak
+            Default: All None except rel_height=0.5 (no restrictions)
+
+    Returns:
+        List[Tuple[float, float]]: List of (tau in s, gamma in Ω) tuples for each detected peak,
+            sorted in ascending tau order.
+
+    Notes:
+        - Peaks are padded internally for boundary handling (scipy.signal.find_peaks requirement)
+        - Padding ensures boundary peaks are properly detected
+        - If num_peaks provided, keeps the num_peaks tallest peaks (by gamma value)
     """
 
     if num_peaks is None:
@@ -106,29 +139,37 @@ def _generate_parameters(
     dispersion_bounds: tuple | None = None,
 ) -> Tuple[Parameters, int]:
     """
-    Generate lmfit.Parameters for each peak, with bounds and initial guesses.
+    Generate lmfit.Parameters for each peak with bounds and initial guesses.
 
-    Parameters
-    ----------
-    peaks : List[Tuple[float64, float64]]
-        List of (log_tau, gamma) tuples for each peak.
-    peak_type : str
-        Type of peak ('HN' or 'SG').
-    skew : bool
-        Whether to allow skew parameter to vary.
-    log_tau0_bound : float or None, optional
-        Bound for log_tau0 parameter. If None, uses 1% bounds.
-    assym_bound : float or None, optional
-        Bound for asymmetry parameters. If None, uses default bounds.
-        For HN: sets beta min to 1 - assym_bound.
-        For SG: sets upsilon bounds to [-assym_bound, +assym_bound].
-    dispersion_bounds : tuple or None, optional
-        Bound for dispersion parameters. If None, uses default bounds.
+    Creates parameter objects for nonlinear least squares optimization, including
+    peak position, height, width, and shape parameters. Initializes bounds based
+    on peak properties and user constraints.
 
-    Returns
-    -------
-    Tuple[Parameters, int]
-        Parameters object and number of variables.
+    Parameters:
+        peaks (List[Tuple[float64, float64]]): List of (log(tau) in s, gamma in Ω) tuples for each peak.
+        peak_type (str): Peak model type: "HN" (Havriliak-Negami) or "SG" (Skewed Gaussian).
+        skew (bool): If True, allow skew/asymmetry parameter to vary during optimization.
+        log_tau0_bound (float | None): Relative bound for log_tau0 parameter position (unitless fraction).
+            If None, uses 1% bounds. If provided, bounds are ±log_tau0_bound relative to initial value.
+            Example: 0.1 = 10% bounds on either side.
+        assym_bound (float | None): Bound for asymmetry parameters (unitless, 0-1).
+            If None, uses defaults: HN beta ∈ [0.5, 1], SG upsilon ∈ [-1, 1].
+            For HN: sets beta_min = 1 - assym_bound, beta_max = 1.
+            For SG: sets upsilon bounds to [-assym_bound, +assym_bound].
+        dispersion_bounds (tuple | None): Bounds for dispersion/width parameters (unitless).
+            If None, uses defaults: HN alpha ∈ [0.1, 1], SG sigma > 0.01 (ln units).
+
+    Returns:
+        Tuple[Parameters, int]: (lmfit.Parameters object with all peak parameters, count of free variables).
+
+    Raises:
+        ValueError: If peaks list is empty, or bound parameters are out of valid ranges.
+        TypeError: If parameter types are incorrect.
+
+    Notes:
+        - Parameters are numbered sequentially (peak_0_log_tau0, peak_0_height, etc.)
+        - Initial parameter values derived from detected peak positions and heights
+        - Parameters linked to prevent negative heights/widths via constraints
     """
 
     if len(peaks) < 1:
@@ -281,19 +322,23 @@ def _function(
     """
     Compute the fitted DRT spectrum for given parameters and peak type.
 
-    Parameters
-    ----------
-    log_tau : np.ndarray
-        Logarithm of tau values.
-    parameters : Parameters
-        lmfit Parameters object.
-    peak_type : str
-        Type of peak ('HN' or 'SG').
+    Combines multiple peaks (Havriliak-Negami or Skewed Gaussian) to generate
+    the complete fitted DRT spectrum at specified relaxation times.
 
-    Returns
-    -------
-    np.ndarray
-        Fitted gamma values.
+    Parameters:
+        log_tau (NDArray[float64]): Array of log10(tau) values in s (seconds) where DRT is evaluated.
+        parameters (Parameters): lmfit.Parameters object containing peak parameters
+            (log_tau0, Z0/height, alpha/sigma, beta/upsilon for each peak).
+        peak_type (str): Peak model type: "HN" (Havriliak-Negami) or "SG" (Skewed Gaussian).
+
+    Returns:
+        NDArray[float64]: Fitted gamma values in Ω (Ohms), same shape as log_tau.
+
+    Notes:
+        - For HN peaks: converts log_tau to tau (linear scale) for HN_DRT function
+        - For SG peaks: operates in log-scale directly
+        - Multiple peaks are summed to produce total DRT
+        - Parameters indexed sequentially (peak_0, peak_1, etc.)
     """
     params = parameters.valuesdict()
 
@@ -337,8 +382,24 @@ def _residual(
     peak_type: str,
 ) -> NDArray[float64]:
     """
-    Residual function for minimization: difference between fit and data.
+    Calculate residuals between experimental and fitted DRT spectra.
+
+    Computes absolute difference |gamma_fit - gamma_exp| for least squares minimization.
     Uses absolute residuals rather than relative to avoid divide-by-zero issues.
+
+    Parameters:
+        parameters (Parameters): lmfit.Parameters object with current peak parameter values.
+        log_tau (NDArray[float64]): Array of log10(tau) in s (seconds) where DRT is evaluated.
+        gamma (NDArray[float64]): Experimental gamma values in Ω (Ohms).
+        peak_type (str): Peak model type: "HN" (Havriliak-Negami) or "SG" (Skewed Gaussian).
+
+    Returns:
+        NDArray[float64]: Absolute residuals |gamma_fit - gamma_exp| in Ω, same shape as input arrays.
+
+    Notes:
+        - Called repeatedly during optimization by lmfit.minimize
+        - Uses absolute value to avoid sign bias in fitting
+        - Returned array squared and summed by lmfit to compute cost function
     """
     return np.abs(_function(log_tau, parameters, peak_type) - gamma)
 
@@ -346,7 +407,23 @@ def _residual(
 @dataclass(frozen=True)
 class DRTPeak:
     """
-    Represents a single DRT peak and its parameters.
+    Represents a single DRT peak with its parameters and evaluation methods.
+
+    Container for all parameters describing one peak in the DRT decomposition,
+    supporting both Havriliak-Negami and Skewed Gaussian models. Provides methods
+    to evaluate gamma (DRT value) at specified relaxation times and compute peak area.
+
+    Attributes:
+        label (str): Descriptive label for the peak (e.g., "Peak 0", "HF process").
+        peak_params (dict): Dictionary containing peak parameters:
+            - "peak_type" (str): "HN" or "SG"
+            - "log_tau0" (float): log10(tau_0) in s
+            - "Z0" (float): HN peak height in Ω (for HN only)
+            - "alpha" (float): HN dispersion parameter (for HN, unitless)
+            - "beta" (float): HN asymmetry parameter (for HN, unitless)
+            - "height" (float): SG peak height in Ω (for SG only)
+            - "upsilon" (float): SG skewness parameter (for SG, unitless)
+            - "sigma" (float): SG width in log-scale (for SG, unitless)
     """
 
     label: str
@@ -354,17 +431,20 @@ class DRTPeak:
 
     def get_gamma(self, tau: float | NDArray) -> float | NDArray:
         """
-        Calculate gamma (DRT value) for this peak at given tau(s).
+        Calculate gamma (DRT value) for this peak at given relaxation time(s).
 
-        Parameters
-        ----------
-        tau : float or np.ndarray
-            Time constant(s) at which to evaluate gamma.
+        Evaluates the peak using the appropriate model (HN or SG) and stored parameters.
 
-        Returns
-        -------
-        float or np.ndarray
-            Gamma value(s) for this peak.
+        Parameters:
+            tau (float | NDArray[float64]): Relaxation time(s) in s (seconds) at which to evaluate gamma.
+
+        Returns:
+            float | NDArray[float64]: Gamma value(s) in Ω (Ohms). Type matches input (float or array).
+
+        Notes:
+            - For HN peaks: converts log_tau0 to linear tau for HN_DRT evaluation
+            - For SG peaks: converts tau to log-scale for SG_DRT evaluation
+            - Scalar input returns scalar output; array input returns array output
         """
         tau = np.asarray(tau)
         if self.peak_params["peak_type"] == "HN":
@@ -389,32 +469,29 @@ class DRTPeak:
 
     def get_Z(self, quad_opts: Dict | None = None) -> float64:
         """
-        Calculate the peak area (Z) for this peak.
-        For HN peaks, returns Z0 directly. For SG peaks, integrates gamma.
+        Calculate the peak area (integral) for this peak.
 
-        Parameters
-        ----------
-        quad_opts : dict | None, optional
-        Dictionary of options to pass to scipy.integrate.quad for peak area calculation.
-        May need to reduce a and b limits if getting integration warnings. Likely you just start getting numeric instability when interval is too large.
-        With typical peak sizes, limits of -20 to 5 are more than reasonable (1e-8 to 1e2 tau).
+        For Havriliak-Negami peaks, returns Z0 directly. For Skewed Gaussian peaks,
+        integrates gamma over log(tau) domain to compute equivalent peak area.
 
-        If None, uses:
-            {'epsabs': 1e-9, 'epsrel': 1e-9, 'limit': 100, 'a': -20, 'b': 20}
-        Valid keys:
-            - 'epsabs': Absolute error tolerance (default: 1e-9)
-            - 'epsrel': Relative error tolerance (default: 1e-9)
-            - 'limit': Maximum number of subintervals (default: 100)
-            - 'a': Lower integration limit (default: -50)
-            - 'b': Upper integration limit (default: 50)
-        Example:
-            quad_opts = {'epsabs': 1e-8, 'epsrel': 1e-8, 'limit': 200, 'a': -20, 'b': 5}
+        Parameters:
+            quad_opts (dict | None): Dictionary of options for scipy.integrate.quad numerical integration.
+                Only used for SG peaks. Default: None (uses preset values).
+                May need adjustment if integration warnings occur; reduce 'a' and 'b' limits if interval too large.
+                Valid keys:
+                    - 'epsabs' (float): Absolute error tolerance (default: 1e-9)
+                    - 'epsrel' (float): Relative error tolerance (default: 1e-9)
+                    - 'limit' (int): Maximum number of subintervals (default: 100)
+                    - 'a' (float): Lower integration limit log(tau) (default: -20, ~1e-8 s)
+                    - 'b' (float): Upper integration limit log(tau) (default: 20, ~1e8 s)
+                Example: {'epsabs': 1e-8, 'epsrel': 1e-8, 'limit': 200, 'a': -20, 'b': 5}
 
+        Returns:
+            float64: Peak area Z in Ω (Ohms). For HN peaks, equals Z0. For SG peaks, integral result.
 
-        Returns
-        -------
-        float64
-            Area under the peak (Z value).
+        Notes:
+            - HN: Direct return (constant time complexity)
+            - SG: Requires numerical integration (requires ~100 function evaluations by default)
         """
         if self.peak_params["peak_type"] == "HN":
             return self.peak_params["Z0"]
@@ -445,7 +522,16 @@ class DRTPeak:
 @dataclass(frozen=True)
 class DRTPeaks:
     """
-    Container for a set of DRT peaks and fit summary.
+    Container for a set of DRT peaks and their fit results.
+
+    Aggregates multiple DRTPeak objects with fit quality metrics. Provides methods
+    to evaluate total DRT (summed over peaks) and compute peak properties at specified
+    relaxation times.
+
+    Attributes:
+        peaks (List[DRTPeak]): List of DRTPeak objects for each identified peak.
+        fit_summary (dict | None): Dictionary containing fit quality metrics and optimization results.
+            Typical keys: "success", "message", "nfev", "nvarys", "chi_square", "reduced_chi_square", etc.
     """
 
     peaks: List[DRTPeak]
@@ -457,12 +543,10 @@ class DRTPeaks:
 
     def get_num_peaks(self) -> int:
         """
-        Get the number of peaks.
+        Get the number of peaks in this collection.
 
-        Returns
-        -------
-        int
-            Number of peaks.
+        Returns:
+            int: Count of peaks in the peaks list.
         """
         return len(self.peaks)
 
@@ -472,19 +556,27 @@ class DRTPeaks:
         peak_indices: List[int] | None = None,
     ) -> NDArray:
         """
-        Sum gamma values for selected peaks at given tau(s).
+        Sum gamma (DRT) values for selected peaks at given relaxation time(s).
 
-        Parameters
-        ----------
-        tau : float or np.ndarray
-            Time constant(s) at which to evaluate gamma.
-        peak_indices : list of int or None, optional
-            Indices of peaks to include. If None, includes all.
+        Evaluates each peak and sums their gamma values at specified tau values.
+        Allows selective inclusion of peaks by index.
 
-        Returns
-        -------
-        np.ndarray
-            Summed gamma values.
+        Parameters:
+            tau (float | NDArray[float64]): Relaxation time(s) in s (seconds) at which to evaluate gamma.
+            peak_indices (List[int] | None): Indices of peaks to include in sum. If None, includes all peaks.
+                Indices range from 0 to get_num_peaks()-1. Default: None (all peaks).
+
+        Returns:
+            NDArray[float64]: Summed gamma values in Ω (Ohms), shape matching tau input.
+
+        Raises:
+            TypeError: If peak_indices is not list/tuple/array or contains non-integers.
+            ValueError: If peak_indices contains indices outside valid range [0, num_peaks).
+
+        Notes:
+            - Output shape matches input tau shape
+            - For scalar tau, returns shape () array (compatible with arithmetic)
+            - Peaks summed in order; peak_indices order does not affect result
         """
         num_peaks = self.get_num_peaks()
         if peak_indices is None:
@@ -514,17 +606,21 @@ class DRTPeaks:
         quad_opts: dict | None = None,
     ) -> float64:
         """
-        Get the area (Z) for a specific peak by index.
+        Get the area (Z value) for a specific peak by index.
 
-        Parameters
-        ----------
-        index : int
-            Index of the peak.
+        Retrieves peak from collection and computes its area. For SG peaks, may require
+        numerical integration (uses default or provided options).
 
-        Returns
-        -------
-        float64
-            Area under the peak (Z value).
+        Parameters:
+            index (int): Index of peak to query (0-based, range 0 to num_peaks-1).
+            quad_opts (dict | None): scipy.integrate.quad options for SG peak integration. Default: None.
+
+        Returns:
+            float64: Peak area Z in Ω (Ohms).
+
+        Raises:
+            TypeError: If index is not an integer.
+            IndexError: If index outside valid range [0, num_peaks).
         """
         num_peaks = len(self.peaks)
         if not isinstance(index, int):
@@ -542,19 +638,25 @@ class DRTPeaks:
         quad_opts: dict | None = None,
     ) -> pd.DataFrame:
         """
-        Return a DataFrame with each row representing a peak.
-        Columns: label, all peak_params, tau0 (np.exp(log_tau0)), and Z (peak.get_Z()).
-        Note: SG peak Z uses default integration parameters. May be able to refine guess using get_Z directly.
+        Export peaks to DataFrame with each row representing one peak.
 
-        Parameters
-        ----------
-        peak_indices : list of int or None, optional
-            Indices of peaks to include. If None, includes all.
+        Columns include: label, all peak_params keys, tau0 (linear from log_tau0), and Z (computed area).
+        Useful for analysis, visualization, and export to files.
 
-        Returns
-        -------
-        pd.DataFrame
-            DataFrame of peak parameters and derived quantities.
+        Parameters:
+            peak_indices (List[int] | None): Indices of peaks to include. If None, includes all peaks. Default: None.
+            quad_opts (dict | None): scipy.integrate.quad options for SG peak area calculation. Default: None (uses defaults).
+
+        Returns:
+            pd.DataFrame: DataFrame with one row per peak. Columns:
+                - "label" (str): Peak label/identifier
+                - All peak_params keys ("peak_type", "log_tau0", "Z0"/"height", "alpha"/"sigma", "beta"/"upsilon")
+                - "tau0" (float): Linear tau0 in s (computed from log_tau0)
+                - "Z" (float64): Peak area in Ω (Ohms)
+
+        Notes:
+            - SG peak areas use default quad options (may be overridden via quad_opts)
+            - Row order matches peak order (or provided peak_indices order)
         """
         if peak_indices is None:
             selected_peaks = self.peaks
@@ -584,41 +686,48 @@ def fit_DRT_peaks(
     minimizer_settings: dict = None,
 ) -> DRTPeaks:
     """
-    Fit DRT peaks to the provided DRT data using nonlinear least squares.
+    Fit DRT peaks to provided data using nonlinear least squares optimization.
 
-    Parameters
-    ----------
-    DRTData_object : DRTData
-        DRT data object containing tau and gamma arrays.
-    peak_positions : list or np.ndarray or None
-        List of (tau, gamma) tuples for peak positions. If None, peaks are found automatically.
-    num_peaks : int or None, optional
-        Number of peaks to fit. If None, uses all found peaks.
-    peak_type : str, optional
-        Type of peak ('HN' or 'SG'). Default is 'HN'.
-    skew : bool, optional
-        Whether to allow skew parameter to vary. Default is True.
-    log_tau0_bound : float or None, optional
-        Bound for log_tau0 parameter. Default is 0.1 (roughly 10 %).
-    assym_bound : float or None, optional
-        Bound for asymmetry parameters. If None, uses default bounds.
-        For HN: sets beta min to 1 - assym_bound.
-        For SG: sets upsilon bounds to [-assym_bound, +assym_bound].
-        Must be <= 1.
-    dispersion_bounds : tuple or None, optional
-        Bound for dispersion parameters. If None, uses default bounds.
+    Automatically detects peaks (if needed), initializes parameters with bounds, and
+    optimizes to fit selected peak models (Havriliak-Negami or Skewed Gaussian) to DRT data.
+    Adjusts peak count if number of variables exceeds data points (prevents overfitting).
 
-    minimizer_settings : dict or None, optional
-        Dictionary with minimizer method and fit_kws. E.g. {"method": "leastsq", "fit_kws": {...}} methods include 'leastsq', 'nelder', 'lbfgsb', 'differential_evolution', etc.
-        L2 norm minimisation gives preference to peak height, L1 norm to peak area (for uniform tau).
-        Notably, whilst leastsq etc uses L2 norm, nelder-mead and powell use L1 norm.
-        Nelder-mead sticks closer to initial conditions, which I have found gives more sensible results.
-        Other fit kwords include ftol and xtol.
+    Parameters:
+        DRTData_object (DRTData): DRT data object containing tau and gamma arrays.
+        peak_positions (List[Tuple[float, float]] | NDArray[float64] | None): Initial peak positions as (tau in s, gamma in Omega) tuples.
+            If None, peaks are detected automatically via find_DRT_peaks. Default: None.
+        num_peaks (int | None): Target number of peaks to fit. If None, uses all detected peaks.
+            Only used if peak_positions is None. Default: None.
+        peak_type (str): Peak model type: "HN" (Havriliak-Negami) or "SG" (Skewed Gaussian). Default: "HN".
+        skew (bool): If True, allow asymmetry parameter (beta for HN, upsilon for SG) to vary. Default: True.
+        log_tau0_bound (float | None): Relative bound for peak position parameter (unitless fraction).
+            Default: 0.1 (approximately ±10% bounds). If None, uses 1% bounds. Example: 0.2 = ±20%.
+        assym_bound (float | None): Bound for asymmetry parameters (unitless, 0-1 range).
+            If None, uses defaults: HN beta in [0.5, 1], SG upsilon in [-1, 1].
+            For HN: sets beta_min = 1 - assym_bound, beta_max = 1.
+            For SG: sets upsilon bounds to [-assym_bound, +assym_bound].
+            Must satisfy 0 <= assym_bound <= 1. Default: None.
+        dispersion_bounds (tuple | None): Bounds for dispersion parameters (unitless).
+            If None, uses defaults: HN alpha in [0, 1], SG sigma in [1e-10, 1e2].
+            Default: None.
+        minimizer_settings (dict | None): Optimization settings dictionary with keys:
+            - "method" (str): Minimizer method ("leastsq", "nelder", "lbfgsb", "differential_evolution", etc.)
+            - "fit_kws" (dict): Additional keywords for lmfit.minimize (ftol, xtol, etc.)
+            Note: "leastsq" uses L2 norm (prefers peak height); "nelder"-type use L1 norm (prefers peak area).
+            "nelder" recommended for convergence near initial conditions. Default: None (uses leastsq).
 
-    Returns
-    -------
-    DRTPeaks
-        Fitted peaks and fit summary.
+    Returns:
+        DRTPeaks: Fitted peaks (DRTPeak objects) and fit summary (success indicator, residuals, etc.).
+
+    Raises:
+        ValueError: If both num_peaks and peak_positions provided, peak_type not in ["HN", "SG"],
+            or peak_positions is empty list.
+
+    Notes:
+        - Automatically reduces num_peaks if num_variables > len(gamma) (prevents overfitting)
+        - Peaks sorted by height before removal if overfitting detected
+        - Uses natural logarithm (base e) for tau spacing (more natural for HN basis)
+        - Fits absolute residuals |gamma_fit - gamma_exp| to avoid divide-by-zero issues
     """
 
     tau = DRTData_object.tau.copy()

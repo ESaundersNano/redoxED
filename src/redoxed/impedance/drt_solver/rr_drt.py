@@ -624,6 +624,8 @@ class DRT_rr_solver:
         return A
 
     def _assemble_M_matrix(self) -> NDArray[float64]:
+        """
+        Assembles the M matrix for the regularization term in the DRT problem."""
 
         tau_l_vec = self.tau_l_vec
         mu = self.mu
@@ -713,6 +715,9 @@ class DRT_rr_solver:
         return M
 
     def _calculate_matrices(self):
+        """
+        Calculates the A and M matrices for the DRT problem, using multiprocessing if specified.
+        """
         # Setup problem
 
         f: NDArray = self.f
@@ -751,9 +756,6 @@ class DRT_rr_solver:
 
         - `Wan, T. H., Saccoccio, M., Chen, C., and Ciucci, F., 2015, Electrochim. Acta, 184, 483-499 <https://doi.org/10.1016/j.electacta.2015.09.097>`_
         - `Effat, M. B. and Ciucci, F., 2017, Electrochim. Acta, 247, 1117-1129 <https://doi.org/10.1016/j.electacta.2017.07.050>`_
-
-        Parameters
-        ----------
 
         """
         # Setup problem

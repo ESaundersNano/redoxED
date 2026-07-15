@@ -1,3 +1,14 @@
+"""Radial Basis Function (RBF) implementations and utilities for DRT discretization.
+
+Provides RBF types (Matérn, Cauchy, Gaussian, inverse-quadratic, inverse-quadric, piecewise-linear)
+and computes inner products of RBF derivatives for discretization matrix assembly in DRT solver.
+Supports both standard and offset RBF formulations with derivative orders 1 and 2.
+
+References:
+    - Radial basis function theory for function approximation
+    - RBF-DRT methods: https://doi.org/10.1016/j.electacta.2015.09.097
+"""
+
 from typing import Callable, Dict, List
 import numpy as np
 from scipy.integrate import quad
@@ -57,6 +68,41 @@ def _inner_product_rbf(
     derivative_order: int,
     rbf_type: str,
 ) -> float:
+    """
+    Calculate the inner product of RBF derivatives for discretization matrix.
+
+    Computes ∫ φ'(ln(τ/τ_p)) * ψ'(ln(τ/τ_q)) dτ/τ for RBF derivatives,
+    which is used to construct the regularization/smoothing matrix M in DRT solver.
+
+    Parameters:
+        tau_p (float): First relaxation time in s (seconds).
+        tau_q (float): Second relaxation time in s (seconds).
+        mu (float): RBF shape parameter (controls width/localization).
+        derivative_order (int): Order of derivative (1 or 2) for regularization.
+        rbf_type (str): RBF type from _RBF_TYPES list:
+            - "c0-matern": Matérn C0 (exponential)
+            - "c2-matern": Matérn C2 (smoother exponential)
+            - "c4-matern": Matérn C4 (smoother still)
+            - "c6-matern": Matérn C6 (highest smoothness)
+            - "cauchy": Cauchy function
+            - "gaussian": Gaussian (RBF)
+            - "inverse-quadratic": 1/(1 + (μx)²)
+            - "inverse-quadric": 1/√(1 + (μx)²)
+            - "piecewise-linear": Piecewise linear
+
+    Returns:
+        float: Inner product value (dimensionless).
+
+    Raises:
+        NotImplementedError: If derivative_order not supported for RBF type.
+        ValueError: If rbf_type not recognized.
+
+    Notes:
+        - For each RBF type, analytical expressions are used where available
+        - For inverse-quadric, numerical integration via scipy.integrate.quad is used
+        - Parameter a = μ * ln(τ_p / τ_q) is used internally for log-space calculations
+        - Different Matérn orders (C0, C2, C4, C6) provide varying smoothness properties
+    """
     a: float = mu * np.log(tau_p / tau_q)
 
     if rbf_type == "c0-matern":

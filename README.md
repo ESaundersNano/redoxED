@@ -34,15 +34,31 @@ pip install -e .
 
 See [notebooks](https://github.com/ESaundersNano/redoxED/tree/main/notebooks) for demonstration of main features.
 
+### Echem Data Extraction
+Battery cycling data, EIS, and polarisation data can be loaded directly from raw potentiostat files or csv. Alternatively, the classes defined for each data type can be instanced directly. 
+
 ### DRT Analysis
+An open, transparent, and configurable implementation of distribution of relaxation times (DRT) analysis developed to support our work.
 
+DRT is calculated from EIS spectra, based on code from https://github.com/ciuccislab/pyDRTtools and https://github.com/vyrjana/pyimpspec. The main distinction from theses solvers is the ability to explicitly choose the time constants used for calculation, independent of the frequency points provided. By default, our solver uses (1/2$\pi f$) vs (1/f) used in these other implmentations. 
+DRT with lumped series capacitance is also implemented to support Li work. Additionally, all solver options (e.g. integration and optimisation algorithm choices) are made available for tuning by the user. 
 
-An open, transparent, and configurable implementation of DRT developed to support our work.
-Based on code from https://github.com/ciuccislab/pyDRTtools and https://github.com/vyrjana/pyimpspec
+Additional functionality allows for peak fitting and reconstructing impedance spectra. 
+
 This module uses Tikhonov regularization and either radial basis function or piecewise linear discretization
 - 10.1016/j.electacta.2015.09.097 # radial basis functions for DRT
 - 10.1149/1945-7111/acbca4 # hyperparameter selection
 - 10.1021/acselectrochem.5c00334 # DRTtools
+
+### Plotting
+
+redoxED supports batch plotting of DC and AC figures including:
+- Battery efficiency plots
+- Other battery metrics
+- Polarisation curves
+- Nyquist and Bode plots
+- DRT spectra
+- Residuals plots for model fits.
 
 ### LaTeX Rendering
 
