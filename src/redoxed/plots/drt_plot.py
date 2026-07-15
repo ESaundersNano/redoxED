@@ -28,11 +28,12 @@ class DRTPlot(BasePlot):
         """
         Initialize a DRT plot.
 
-        Args:
-            fc_axis (bool): Whether to add characteristic frequency axis. Defaults to False.
+        Parameters:
+            fc_axis (bool): Whether to add characteristic frequency axis on top of tau axis.
+                Defaults to False.
             usetex (bool | None): Whether to use LaTeX rendering.
-                                   If None, uses global config setting.
-            **kwargs: Additional arguments passed to plt.subplots().
+                If None, uses global config setting. Defaults to None.
+            **kwargs: Additional arguments passed to BasePlot.
         """
         super().__init__(usetex=usetex, **kwargs)
         self.ax_top: plt.Axes | None = None
@@ -63,10 +64,11 @@ class DRTPlot(BasePlot):
         """
         Add characteristic frequency axis on top of the plot.
 
-        This creates a twin x-axis showing the characteristic frequency
-        fc = 1/(2π·τ) corresponding to the time constants.
+        Creates a secondary x-axis showing the characteristic frequency fc = 1/(2π·τ)
+        corresponding to the time constants on the primary x-axis. This provides an
+        alternative frequency scale useful for impedance analysis.
 
-        Should be done after setting the main x-axis limits.
+        Should be called after the main x-axis limits are set to ensure correct scaling.
         """
         # Clear the existing ax_top if it exists
         if self.ax_top is not None:
@@ -94,9 +96,10 @@ class DRTPlot(BasePlot):
         """
         Add DRT data to the plot.
 
-        Args:
-            drt_data (DRTData): The DRT data object to plot.
-            label (str | None): Label for the plot. If None, uses the data's label.
+        Parameters:
+            drt_data (DRTData): The DRT data object containing distribution data to plot.
+            label (str | None): Label for the plot series. If None, uses the data's label.
+                Defaults to None.
             **kwargs: Additional arguments passed to matplotlib plot function.
         """
         if label is None:

@@ -25,10 +25,10 @@ class NyquistPlot(BasePlot):
         """
         Initialize a Nyquist plot.
 
-        Args:
+        Parameters:
             usetex (bool | None): Whether to use LaTeX rendering.
-                                   If None, uses global config setting.
-            **kwargs: Additional arguments passed to plt.subplots().
+                If None, uses global config setting. Defaults to None.
+            **kwargs: Additional arguments passed to BasePlot.
         """
         super().__init__(usetex=usetex, **kwargs)
 
@@ -54,14 +54,15 @@ class NyquistPlot(BasePlot):
         """
         Add EIS data to the Nyquist plot.
 
-        Args:
-            eis_data (EISData): The EIS data object to plot.
-            label (str | None): Label for the plot. If None, uses the data's label.
+        Parameters:
+            eis_data (EISData): The EIS data object containing impedance spectra to plot.
+            label (str | None): Label for the plot series. If None, uses the data's label.
+                Defaults to None.
             **kwargs: Additional arguments passed to matplotlib plot function.
         """
         if label is None:
             label = eis_data.label
-        # Simple matplotlib call - LaTeX preference already set globally
+        # Plot Nyquist representation: -Z_im vs Z_re
         self.ax.plot(eis_data.Z_re, -eis_data.Z_im, label=label, **kwargs)
 
 
@@ -78,10 +79,10 @@ class BodePlot(BasePlot):
         """
         Initialize a Bode plot.
 
-        Args:
+        Parameters:
             usetex (bool | None): Whether to use LaTeX rendering.
-                                    If None, uses global config setting.
-            **kwargs: Additional arguments passed to plt.subplots().
+                If None, uses global config setting. Defaults to None.
+            **kwargs: Additional arguments passed to BasePlot.
         """
         super().__init__(usetex=usetex, **kwargs)
 
@@ -107,13 +108,18 @@ class BodePlot(BasePlot):
         """
         Add EIS data to the Bode plot.
 
-        Args:
-            eis_data (EISData): The EIS data object to plot.
-            label (str | None): Label for the plot. If None, uses the data's label.
-            marker_mag (str): Marker for the magnitude plot.
-            marker_phase (str): Marker for the phase plot.
-            linestyle_mag (str): Line style for the magnitude plot.
-            linestyle_phase (str): Line style for the phase plot.
+        Plots impedance magnitude and phase angle against frequency on semi-log axes.
+        Magnitude is shown on the left y-axis with square markers, phase on the right
+        y-axis with triangular markers.
+
+        Parameters:
+            eis_data (EISData): The EIS data object containing impedance spectra to plot.
+            label (str | None): Label for the plot series. If None, uses the data's label.
+                Defaults to None.
+            marker_mag (str): Marker style for magnitude data. Defaults to "s" (squares).
+            marker_phase (str): Marker style for phase data. Defaults to "^" (triangles).
+            linestyle_mag (str): Line style for magnitude data. Defaults to "" (no line).
+            linestyle_phase (str): Line style for phase data. Defaults to "" (no line).
             **kwargs: Additional arguments passed to matplotlib plot function.
         """
         if label is None:

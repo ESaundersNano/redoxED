@@ -35,9 +35,13 @@ class BasePlot(ABC):
         """
         Initialize the base plot with common setup.
 
-        Args:
-            usetex (bool): Whether to use LaTeX rendering. If None, uses global config.
-            **kwargs: Additional arguments passed to plt.subplots().
+        Configures LaTeX rendering preference, loads custom style, creates figure and axes,
+        and applies plot-specific configuration through the abstract _configure_axes() method.
+
+        Parameters:
+            usetex (bool | None): Whether to use LaTeX rendering. If None, uses global config
+                setting. Defaults to None.
+            **kwargs: Additional arguments passed to matplotlib plt.subplots().
         """
         # Use global config if not specified
         if usetex is None:
@@ -65,9 +69,12 @@ class BasePlot(ABC):
 
     def _setup_latex(self, usetex: bool) -> None:
         """
-        Setup LaTeX rendering preference once.
+        Setup LaTeX rendering preference globally.
 
-        Args:
+        Attempts to enable LaTeX if requested. Falls back to matplotlib's mathtext renderer
+        with appropriate warnings if LaTeX is not available on the system.
+
+        Parameters:
             usetex (bool): Whether to enable LaTeX rendering.
         """
         if usetex:
@@ -115,11 +122,16 @@ class BasePlot(ABC):
 
     def _load_style(self, usetex: bool = False, style_path: str | None = None) -> None:
         """
-        Load the custom Matplotlib style from the .mplstyle file.
+        Load and apply custom matplotlib style from the .mplstyle file.
 
-        Args:
-            usetex (bool): Whether to enable LaTeX rendering. Defaults to False.
-            style_path (str | None): Custom path to style file. If None, uses default.
+        Applies seaborn theme as foundation, then loads custom redoxed_plot.mplstyle file
+        for consistent visualization across all plot types.
+
+        Parameters:
+            usetex (bool): Whether LaTeX rendering is enabled (affects font selection).
+                Defaults to False.
+            style_path (str | None): Custom path to style file. If None, uses default redoxed_plot.mplstyle.
+                Defaults to None.
         """
         font = "Times New Roman" if usetex else "Arial"
 
@@ -158,13 +170,15 @@ class BasePlot(ABC):
         self, spacing_x: float | None = None, spacing_y: float | None = None
     ) -> None:
         """
-        Add major ticks to the axes with specified spacing.
+        Add and configure major tick marks on the axes.
 
-        Args:
-            spacing_x (float | None): Spacing for major ticks on x-axis.
-                If None, x-axis ticks are not modified.
-            spacing_y (float | None): Spacing for major ticks on y-axis.
-                If None, y-axis ticks are not modified.
+        Sets major tick spacing for one or both axes using MultipleLocator.
+
+        Parameters:
+            spacing_x (float | None): Spacing between major ticks on x-axis in data units.
+                If None, x-axis ticks are not modified. Defaults to None.
+            spacing_y (float | None): Spacing between major ticks on y-axis in data units.
+                If None, y-axis ticks are not modified. Defaults to None.
         """
         if spacing_x is not None:
             self.ax.xaxis.set_major_locator(MultipleLocator(spacing_x))
@@ -175,13 +189,16 @@ class BasePlot(ABC):
         self, number_x: int | None = None, number_y: int | None = None
     ) -> None:
         """
-        Add minor ticks to the axes.
+        Add and configure minor tick marks on the axes.
 
-        Args:
-            number_x (int | None): Number of minor ticks between major ticks on x-axis.
-                If None, x-axis minor ticks are not modified.
-            number_y (int | None): Number of minor ticks between major ticks on y-axis.
-                If None, y-axis minor ticks are not modified.
+        Sets the number of minor tick subdivisions between major ticks using AutoMinorLocator.
+
+        Parameters:
+            number_x (int | None): Number of minor tick subdivisions on x-axis (e.g., 2 creates
+                one minor tick between major ticks). If None, x-axis minor ticks are not modified.
+                Defaults to None.
+            number_y (int | None): Number of minor tick subdivisions on y-axis.
+                If None, y-axis minor ticks are not modified. Defaults to None.
         """
         if number_x is not None:
             self.ax.xaxis.set_minor_locator(AutoMinorLocator(number_x))
@@ -190,14 +207,20 @@ class BasePlot(ABC):
 
     def save(self, filename: str, **kwargs: Any) -> None:
         """
-        Save the plot to a file.
+        Save the plot to a file in raster or vector format.
 
-        Args:
-            filename (str): Path and filename for the saved plot.
-            **kwargs: Additional arguments passed to plt.savefig().
+        Parameters:
+            filename (str): Path and filename for the output file. Format is determined by extension
+                (e.g., '.png' for raster, '.pdf' or '.svg' for vector).
+            **kwargs: Additional arguments passed to matplotlib's savefig() function.
         """
         self.fig.savefig(filename, **kwargs)
 
-    def copy(self):
-        """Return a deep copy of this plot instance."""
+    def copy(self) -> "BasePlot":
+        """
+        Return a deep copy of this plot instance.
+
+        Returns:
+            BasePlot: A new independent copy of this plot object.
+        """
         return copy.deepcopy(self)

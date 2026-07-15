@@ -7,6 +7,7 @@ from electrochemical impedance spectroscopy data analysis.
 
 import matplotlib.pyplot as plt
 import numpy as np
+from typing import Any
 from matplotlib.ticker import LogLocator
 
 from .base_plot import BasePlot
@@ -26,16 +27,24 @@ class ResidualsPlot(BasePlot):
         self,
         usetex: bool | None = None,
         mode: str = "absolute",
-        Z_rep="cartesian",
-        **kwargs: object,
+        Z_rep: str = "cartesian",
+        **kwargs: Any,
     ) -> None:
         """
         Initialize a residuals plot.
 
-        Args:
+        Parameters:
             usetex (bool | None): Whether to use LaTeX rendering.
-            mode (str): 'absolute' for Ohms, 'relative' for percent residuals.
-            **kwargs: Additional arguments passed to plt.subplots().
+                If None, uses global config setting. Defaults to None.
+            mode (str): Residual representation mode. Choose 'absolute' for residuals
+                in Ohms (Ω), or 'relative' for residuals as percentage (%). Defaults to 'absolute'.
+            Z_rep (str): Impedance representation for display. Choose 'cartesian' for
+                real/imaginary components, or 'polar' for magnitude/phase. Defaults to 'cartesian'.
+            **kwargs: Additional arguments passed to BasePlot.
+
+        Raises:
+            ValueError: If mode is not 'absolute' or 'relative'.
+            ValueError: If Z_rep is not 'cartesian' or 'polar'.
         """
         self.mode = mode
         self.Z_rep = Z_rep
@@ -78,15 +87,23 @@ class ResidualsPlot(BasePlot):
         self,
         residuals_data: ResidualsData,
         label: str | None = None,
-        **kwargs: object,
+        **kwargs: Any,
     ) -> None:
         """
         Add residual data to the plot from a ResidualsData object.
 
-        Args:
-            residuals_data (ResidualsData): Container with frequency and residuals.
-            label (str | None): Label for the plot. Defaults to 'residuals'.
+        Plots residuals at each frequency point. For 'cartesian' representation,
+        shows real and imaginary components. For 'polar' representation, shows
+        magnitude and phase residuals.
+
+        Parameters:
+            residuals_data (ResidualsData): Container object with frequency and residuals data.
+            label (str | None): Label for the plot series. If None, defaults to 'residuals'.
+                Defaults to None.
             **kwargs: Additional arguments passed to matplotlib plot function.
+
+        Raises:
+            TypeError: If residuals_data is not a ResidualsData object.
         """
         if not isinstance(residuals_data, ResidualsData):
             raise TypeError("add_plot expects a ResidualsData object as input.")

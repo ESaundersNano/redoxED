@@ -6,7 +6,7 @@ polarisation data, including current density vs. potential plots.
 """
 
 import matplotlib.pyplot as plt
-from typing import Optional, Any
+from typing import Any
 
 from redoxed.dc import PolarisationData
 from .base_plot import BasePlot
@@ -19,14 +19,14 @@ class PolarisationPlot(BasePlot):
     Creates a plot of voltage vs. current density for polarisation measurements.
     """
 
-    def __init__(self, usetex: Optional[bool] = None, **kwargs: Any) -> None:
+    def __init__(self, usetex: bool | None = None, **kwargs: Any) -> None:
         """
         Initialize a polarisation plot.
 
-        Args:
-            usetex (Optional[bool]): Whether to use LaTeX rendering.
-                                   If None, uses global config setting.
-            **kwargs: Additional arguments passed to plt.subplots().
+        Parameters:
+            usetex (bool | None): Whether to use LaTeX rendering.
+                If None, uses global config setting. Defaults to None.
+            **kwargs: Additional arguments passed to BasePlot.
         """
         super().__init__(usetex=usetex, **kwargs)
 
@@ -46,15 +46,17 @@ class PolarisationPlot(BasePlot):
     def add_plot(
         self,
         polarisation_data: PolarisationData,
-        label: Optional[str] = None,
+        label: str | None = None,
         **kwargs: Any,
     ) -> None:
         """
         Add polarisation data to the plot.
 
-        Args:
-            polarisation_data (PolarisationData): The polarisation data object to plot.
-            label (Optional[str]): Label for the plot. If None, uses the data's label.
+        Parameters:
+            polarisation_data (PolarisationData): The polarisation data object containing
+                voltage and current density data to plot.
+            label (str | None): Label for the plot series. If None, uses the data's label.
+                Defaults to None.
             **kwargs: Additional arguments passed to matplotlib plot function.
         """
         if label is None:
