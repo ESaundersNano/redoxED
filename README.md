@@ -2,9 +2,9 @@
 
 A Python package for electrochemical data analysis and visualisation.
 
-![PyPI - Python Version](https://img.shields.io/pypi/pyversions/redoxED)
-[![GitHub](https://img.shields.io/github/license/ESaundersNano/redoxED)](https://www.gnu.org/licenses/gpl-3.0.html)
-[![PyPI](https://img.shields.io/pypi/v/redoxED)](https://pypi.org/project/redoxED/)
+[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/redoxED?logo=python&logoColor=white&v=1)](https://pypi.org/project/redoxED/)
+[![GitHub License](https://img.shields.io/github/license/ESaundersNano/redoxED?logo=github&v=1)](https://www.gnu.org/licenses/gpl-3.0.html)
+[![PyPI - Version](https://img.shields.io/pypi/v/redoxED?logo=pypi&logoColor=white&v=1)](https://pypi.org/project/redoxED/)
 <!-- Add in similar for tests and build? -->
 
 
