@@ -8,6 +8,7 @@ for porous electrodes with various boundary conditions.
 from numpy import pi, inf
 from numpy import float64, complex128
 from numpy.typing import NDArray
+import numpy as np
 
 import pyimpspec
 
