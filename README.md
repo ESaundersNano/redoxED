@@ -128,7 +128,7 @@ plot2 = NyquistPlot(usetex=False)  # Font settings may be inconsistent
 ```
 
 ## Citing/Contributing
-To cite this work, please cite:
+To cite this work, please cite:  
 Edward Saunders, Baichen Liu, Antoni Forner-Cuenca, Clare P. Grey, Michaël De Volder, A spotter’s guide to electrochemical impedance and distribution of relaxation times spectra in redox flow cells, Journal of Power Sources, Volume 695, 2026, 241243, ISSN 0378-7753, https://doi.org/10.1016/j.jpowsour.2026.241243.
 (https://www.sciencedirect.com/science/article/pii/S0378775326019932)
 
