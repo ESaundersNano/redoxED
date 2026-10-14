@@ -6,11 +6,9 @@ readme = "README.md"
 authors = [
     { name = "ESaundersNano", email = "95654485+ESaundersNano@users.noreply.github.com" }
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 classifiers = [
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
 ]
 
